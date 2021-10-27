@@ -1,0 +1,60 @@
+
+name: Build
+
+on: [ push, pull_request ]
+
+jobs:
+  
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+      
+      - name: Pre-install
+        run: yarn --ignore-engines --network-concurrency 1
+      
+      - name: Run Checks
+        run: |
+          yarn prettier:write
+          yarn lint
+          yarn build
+          yarn docgen
+      
+      - name: Run Coverage
+        run: yarn coverage
+
+      - name: Setup Git Config
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "<>"
+
+      - name: Deploy Goerli
+        if: github.ref == 'refs/heads/goerli'
+        run: |
+          yarn deploy:goerli
+          git commit -am "GitHub Actions - Check in new artifacts"
+          git push origin goerli
+      
+      - name: Deploy Ropsten
+        if: github.ref == 'refs/heads/ropsten'
+        run: |
+          yarn deploy:ropsten
+          git commit -am "GitHub Actions - Check in new artifacts"
+          git push origin ropsten
+      
+      - name: Deploy Mainnet
+        if: github.ref == 'refs/heads/main'
+        run: |
+          yarn deploy:mainnet
+          git commit -am "GitHub Actions - Check in new artifacts"
+          git push origin main
+
+      - name: Run Check Git
+        run: |
+          git diff --quiet --exit-code --cached

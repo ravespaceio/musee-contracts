@@ -1,0 +1,66 @@
+{
+  "name": "musee-contracts",
+  "version": "0.0.1",
+  "description": "NFT contracts for Musee",
+  "scripts": {
+    "clean": "npx hardhat clean",
+    "build": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "patch-coverage": "cp test/utils/nomiclabs.utils.js.patch node_modules/solidity-coverage/plugins/resources/nomiclabs.utils.js",
+    "coverage": "yarn patch-coverage && npx hardhat coverage",
+    "docgen": "npx hardhat docgen",
+    "deploy": "npx hardhat deploy",
+    "deploy:ropsten": "npx hardhat --network ropsten deploy",
+    "deploy:goerli": "npx hardhat --network goerli deploy",
+    "deploy:mainnet": "npx hardhat --network mainnet deploy",
+    "prettier:dryrun": "prettier ./contracts/**/*.sol ./test/**/*.ts ./deploy/**/*.ts",
+    "prettier:write": "prettier --write ./contracts/**/*.sol ./test/**/*.ts ./deploy/**/*.ts",
+    "lint": "yarn lint:sol",
+    "lint:sol": "solhint contracts/**/*.sol contracts/*.sol",
+    "snyk-protect": "snyk protect",
+    "prepare": "npm run snyk-protect",
+    "postinstall": "husky install"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aaronmboyd/musee-contracts.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/aaronmboyd/musee-contracts/issues"
+  },
+  "homepage": "https://github.com/aaronmboyd/musee-contracts#readme",
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.2",
+    "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "@openzeppelin/contracts": "^4.1.0",
+    "@openzeppelin/test-helpers": "^0.5.11",
+    "@types/chai": "^4.2.19",
+    "@types/chai-as-promised": "^7.1.4",
+    "@types/mocha": "^8.2.2",
+    "@types/node": "^16.0.0",
+    "chai-as-promised": "^7.1.1",
+    "chai-ethers": "^0.0.1",
+    "dotenv": "^10.0.0",
+    "ethereum-waffle": "^3.3.0",
+    "ethers": "^5.4.1",
+    "hardhat": "^2.3.3",
+    "hardhat-deploy": "^0.8.11",
+    "hardhat-deploy-ethers": "^0.3.0-beta.10",
+    "hardhat-docgen": "^1.1.1",
+    "husky": "^7.0.1",
+    "prettier": "^2.3.2",
+    "prettier-plugin-solidity": "^1.0.0-beta.13",
+    "snyk": "^1.654.0",
+    "solhint": "^3.3.6",
+    "solidity-coverage": "^0.7.16",
+    "ts-node": "^10.0.0",
+    "typescript": "^4.3.5"
+  },
+  "snyk": true,
+  "dependencies": {
+    "@nomiclabs/ethereumjs-vm": "^4.2.2"
+  }
+}

@@ -1,0 +1,78 @@
+import { task } from "hardhat/config";
+import "solidity-coverage";
+import "hardhat-docgen";
+import "@nomiclabs/hardhat-waffle";
+import "hardhat-deploy";
+import "@nomiclabs/hardhat-ethers";
+
+task("accounts", "Prints the list of accounts", async (args, hre) => {
+  const accounts = await hre.ethers.getSigners();
+
+  for (const account of accounts) {
+    console.log(await account.address);
+  }
+});
+
+const ETH_DERIVATION_PATH = "m/44'/52752'/0'/0/";
+
+function getMnemonic(network:string) : string {
+	require("dotenv").config({ path: `.env.${network}` });
+	return process.env.MNEMONIC || '';
+};
+
+export default {
+  networks: {
+    hardhat: {
+      hardfork: "london",
+      allowUnlimitedContractSize: true,
+      gasPrice: "auto"
+    },
+    mainnet: {
+      url: "https://mainnet.infura.io/v3/e41faa24301e41d2a67002d07c758c2f",
+      accounts: {
+        mnemonic: getMnemonic("mainnet")
+      },
+      allowUnlimitedContractSize: true,
+      gas: "auto",
+      gasPrice: "auto",
+    },
+    goerli: {
+      url: "https://goerli.infura.io/v3/e41faa24301e41d2a67002d07c758c2f",
+      accounts: {
+        mnemonic: getMnemonic("goerli")
+      },
+      allowUnlimitedContractSize: true,
+      gas: "auto",
+      gasPrice: "auto",
+    },
+    ropsten: {
+      url: "https://ropsten.infura.io/v3/e41faa24301e41d2a67002d07c758c2f",
+      accounts: {
+        mnemonic: getMnemonic("ropsten")
+      },
+      allowUnlimitedContractSize: true,
+      gas: "auto",
+      gasPrice: "auto",
+    }
+  },
+  solidity: "0.8.4",
+  namedAccounts: {
+    deployer: {
+      default: 0
+    },
+    user1: {
+      default: 1
+    },
+    user2: {
+      default: 2
+    },
+    user3: {
+      default: 3
+    }
+  },
+  docgen: {
+    path: './docs',
+    clear: true,
+    runOnCompile: true,
+  }
+};

@@ -1,2 +1,2 @@
 # musee-contracts
-Solidity contract
+Solidity contracts for Musee-Dezentral NFTs
