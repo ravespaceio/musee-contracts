@@ -10,11 +10,12 @@
     "coverage": "yarn patch-coverage && npx hardhat coverage",
     "docgen": "npx hardhat docgen",
     "deploy": "npx hardhat deploy",
+    "ipfs": "node --no-warnings ./scripts/ipfs.js",
     "deploy:ropsten": "npx hardhat --network ropsten deploy",
     "deploy:goerli": "npx hardhat --network goerli deploy",
     "deploy:mainnet": "npx hardhat --network mainnet deploy",
-    "prettier:dryrun": "prettier ./contracts/**/*.sol ./test/**/*.ts ./deploy/**/*.ts",
-    "prettier:write": "prettier --write ./contracts/**/*.sol ./test/**/*.ts ./deploy/**/*.ts",
+    "prettier:dryrun": "prettier ./contracts/**/*.sol ./test/**/*.ts ./deploy/**/*.ts ./scripts/*.js",
+    "prettier:write": "prettier --write ./contracts/**/*.sol ./test/**/*.ts ./deploy/**/*.ts ./scripts/*.js",
     "lint": "yarn lint:sol",
     "lint:sol": "solhint contracts/**/*.sol contracts/*.sol",
     "snyk-protect": "snyk protect",
@@ -51,6 +52,7 @@
     "hardhat-deploy-ethers": "^0.3.0-beta.10",
     "hardhat-docgen": "^1.1.1",
     "husky": "^7.0.1",
+    "ipfs-http-client": "^53.0.1",
     "prettier": "^2.3.2",
     "prettier-plugin-solidity": "^1.0.0-beta.13",
     "snyk": "^1.654.0",
@@ -61,6 +63,7 @@
   },
   "snyk": true,
   "dependencies": {
-    "@nomiclabs/ethereumjs-vm": "^4.2.2"
+    "@nomiclabs/ethereumjs-vm": "^4.2.2",
+    "axios": "^0.24.0"
   }
 }

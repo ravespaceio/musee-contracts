@@ -6,12 +6,22 @@ import "./abstract/Exhibitionable.sol";
 import "./interface/IVersionedContract.sol";
 import "@openzeppelin/contracts/token/ERC721/presets/ERC721PresetMinterPauserAutoId.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 contract Frame is IVersionedContract, ReentrancyGuard, Rentable, Exhibitionable, ERC721PresetMinterPauserAutoId {
 
-    enum Category {A,B,C,D,E,F,G,H,I,J,EXHIBITION}
-    mapping(Category => uint256) public categoryPrices;
-    mapping(Category => uint8) public categorySupply;
+   using EnumerableSet for EnumerableSet.UintSet;  
+
+    enum Category {A,B,C,D,E,F,G,H,I,J,K} 
+    struct CategoryDetail {
+        uint256 price;
+        uint256 startingTokenId;
+        uint256 supply;
+        EnumerableSet.UintSet tokenIds;
+    }
+    mapping(Category => CategoryDetail) private categories;
+
+    uint256 randNonce = 0;
 
     /**
      * @notice Returns the storage, major, minor, and patch version of the contract.
@@ -136,10 +146,26 @@ contract Frame is IVersionedContract, ReentrancyGuard, Rentable, Exhibitionable,
      * @dev Sale functions
      *
      */
+ 
+    function randMod(uint256 _modulus) internal returns(uint256)  {
+        randNonce++; 
+        return uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, randNonce))) % _modulus;
+    }
+
     function purchase(Category _category) external payable nonReentrant {
-        require(categorySupply[_category] > 0, "Frame: Sold out");
-        uint256 purchaseCost = categoryPrices[_category];
-        require(msg.value >= (purchaseCost), "Frame: Not paid enough");
+        
+        CategoryDetail storage category = categories[_category];
+        
+        require(category.tokenIds.length() > 0, "Frame: Sold out");
+        require(msg.value >= category.price, "Frame: Not paid enough");        
+
+        // Note: this randomizer function is not safe and is only used temporarily for test purposes
+        // Will be updated with Chainlink VRF - https://docs.chain.link/docs/chainlink-vrf/
+
+        uint256 selection = randMod(category.tokenIds.length());
+        uint256 tokenToTransfer = category.tokenIds.at(selection);
+        _transfer(address(this), _msgSender(), tokenToTransfer);
+        category.tokenIds.remove(tokenToTransfer);
     }
 
     /**
@@ -150,7 +176,7 @@ contract Frame is IVersionedContract, ReentrancyGuard, Rentable, Exhibitionable,
      * See {ERC721-tokenURI}.
      */
     constructor() ERC721PresetMinterPauserAutoId("Frame", "FRAME", "https://URI.com/") {
-        _setAllPricesAndSupply();
+        _setAllCategoryDetail();
         _mintAllCategories();
     }
 
@@ -161,7 +187,7 @@ contract Frame is IVersionedContract, ReentrancyGuard, Rentable, Exhibitionable,
         // This is for the OpenSea storefront and should return data in the following format
         // {
         //     "name": "OpenSea Creatures",
-        //     "description": "OpenSea Creatures are adorable aquatic beings primarily for demonstrating what can be done using the OpenSea platform. Adopt one today to try out all the OpenSea buying, selling, and bidding feature set.",
+        //     "description": "OpenSea Creatures are adorable aquatic beings primarily for demonstrating what can be done using the OpenSea platform",
         //     "image": "https://openseacreatures.io/image.png",
         //     "external_link": "https://openseacreatures.io",
         //     "seller_fee_basis_points": 100, # Indicates a 1% seller fee.
@@ -169,18 +195,18 @@ contract Frame is IVersionedContract, ReentrancyGuard, Rentable, Exhibitionable,
         // }
     }
 
-    function _setAllPricesAndSupply() internal {
-        _setPriceAndSupply(Category.A, 270 ether, 1);
-        _setPriceAndSupply(Category.B, 135 ether, 2);
-        _setPriceAndSupply(Category.C, 81 ether, 6);
-        _setPriceAndSupply(Category.D, 54 ether, 10);
-        _setPriceAndSupply(Category.E, 10.8 ether, 18);
-        _setPriceAndSupply(Category.F, 5.4 ether, 24);
-        _setPriceAndSupply(Category.G, 2.7 ether, 32);
-        _setPriceAndSupply(Category.H, 1.35 ether, 32);
-        _setPriceAndSupply(Category.I, .810 ether, 35);
-        _setPriceAndSupply(Category.J, .270 ether, 40);
-        _setPriceAndSupply(Category.EXHIBITION, 0 ether, 10);
+    function _setAllCategoryDetail() internal {
+        _setCategoryDetail(Category.A, 270 ether, 1, 0);
+        _setCategoryDetail(Category.B, 135 ether, 2, categories[Category.A].startingTokenId + categories[Category.A].supply);
+        _setCategoryDetail(Category.C, 81 ether, 6, categories[Category.B].startingTokenId + categories[Category.B].supply);
+        _setCategoryDetail(Category.D, 54 ether, 10, categories[Category.C].startingTokenId + categories[Category.C].supply);
+        _setCategoryDetail(Category.E, 10.8 ether, 18, categories[Category.D].startingTokenId + categories[Category.D].supply);
+        _setCategoryDetail(Category.F, 5.4 ether, 24, categories[Category.E].startingTokenId + categories[Category.E].supply);
+        _setCategoryDetail(Category.G, 2.7 ether, 32, categories[Category.F].startingTokenId + categories[Category.F].supply);
+        _setCategoryDetail(Category.H, 1.35 ether, 32, categories[Category.G].startingTokenId + categories[Category.G].supply);
+        _setCategoryDetail(Category.I, .810 ether, 35, categories[Category.H].startingTokenId + categories[Category.H].supply);
+        _setCategoryDetail(Category.J, .270 ether, 40, categories[Category.I].startingTokenId + categories[Category.I].supply);
+        _setCategoryDetail(Category.K, 0 ether, 10, categories[Category.J].startingTokenId + categories[Category.J].supply);
     }
 
     function _mintAllCategories() internal {
@@ -194,26 +220,22 @@ contract Frame is IVersionedContract, ReentrancyGuard, Rentable, Exhibitionable,
         _mintCategory(Category.H);
         _mintCategory(Category.I);
         _mintCategory(Category.J);
-        _mintCategory(Category.EXHIBITION);
+        _mintCategory(Category.K);
     }
 
     function _mintCategory(Category _category) internal {
         uint8 index;
-        for(index = 0; index < categorySupply[_category]; index++){
+        uint256 supply = categories[_category].supply;
+        for(index = 0; index < supply; index++){
             mint(address(this));
-        } 
+            categories[_category].tokenIds.add(categories[_category].startingTokenId + index);
+        }
     }
 
-    function setPrice(Category _category, uint256 _price) public onlyOwner(_msgSender()) {
-        categoryPrices[_category] = _price;
-    }
-
-    function setSupply(Category _category, uint8 _supply) public onlyOwner(_msgSender()) {
-        categorySupply[_category] = _supply;
-    }
-
-    function _setPriceAndSupply(Category _category, uint256 _price, uint8 _supply) internal {
-        categoryPrices[_category] = _price;
-        categorySupply[_category] = _supply;
+    function _setCategoryDetail(Category _category, uint256 _price, uint256 _startingTokenId, uint256 _supply) internal {
+        CategoryDetail storage category = categories[_category];
+        category.price = _price;
+        category.startingTokenId = _startingTokenId;
+        category.supply = _supply;
     }
 }

@@ -25,7 +25,9 @@ export default {
     hardhat: {
       hardfork: "london",
       allowUnlimitedContractSize: true,
-      gasPrice: "auto"
+      gasPrice: "auto",
+      gas: "auto",
+      blockGasLimit: 99999999999
     },
     mainnet: {
       url: "https://mainnet.infura.io/v3/e41faa24301e41d2a67002d07c758c2f",
