@@ -55,6 +55,15 @@ export default {
       allowUnlimitedContractSize: true,
       gas: "auto",
       gasPrice: "auto",
+    },
+    rinkeby: {
+      url: "https://rinkeby.infura.io/v3/e41faa24301e41d2a67002d07c758c2f",
+      accounts: {
+        mnemonic: getMnemonic("rinkeby")
+      },
+      allowUnlimitedContractSize: true,
+      gas: "auto",
+      gasPrice: "auto",
     }
   },
   solidity: "0.8.4",
