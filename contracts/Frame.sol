@@ -4,17 +4,14 @@ pragma solidity ^0.8.4;
 import "./abstract/Rentable.sol";
 import "./abstract/Exhibitionable.sol";
 import "./interface/IVersionedContract.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts/token/ERC721/presets/ERC721PresetMinterPauserAutoId.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-contract Frame is IVersionedContract, AccessControl, ReentrancyGuard, Rentable, Exhibitionable, ERC721URIStorage {
-
-    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+contract Frame is IVersionedContract, ReentrancyGuard, Rentable, Exhibitionable, ERC721PresetMinterPauserAutoId {
 
    using EnumerableSet for EnumerableSet.UintSet;  
+   string public contractURI;
 
     enum Category {A,B,C,D,E,F,G,H,I,J,K} 
     struct CategoryDetail {
@@ -42,7 +39,7 @@ contract Frame is IVersionedContract, AccessControl, ReentrancyGuard, Rentable, 
             uint256
         )
     {
-        return (1, 0, 1, 0);
+        return (1, 0, 1, 1);
     }
 
     /**
@@ -57,7 +54,7 @@ contract Frame is IVersionedContract, AccessControl, ReentrancyGuard, Rentable, 
      * @notice Enforces a block value is in the future
      */
     modifier blockInFuture(uint256 _block) {
-        require(_block > block.timestamp, "Frame: Block must be in future");
+        require(_block > block.timestamp, "Frame: Block not in future");
         _;
     }
 
@@ -94,7 +91,7 @@ contract Frame is IVersionedContract, AccessControl, ReentrancyGuard, Rentable, 
         bool owned = owner == _address;
         Rental memory tokenRental = Rentable(this).getRenter(_tokenId);
         bool rented = tokenRental.renter == _address;
-        require(owned || rented, "Frame: Token not owned or rented");
+        require(owned || rented, "Frame: Token not owned / rented");
         _;
     }
 
@@ -103,7 +100,7 @@ contract Frame is IVersionedContract, AccessControl, ReentrancyGuard, Rentable, 
      */
     modifier tokenNotRented(uint256 _tokenId) {       
         Rental memory tokenRental = Rentable(this).getRenter(_tokenId);
-        require(tokenRental.rentalExpiryBlock == 0 || tokenRental.rentalExpiryBlock < block.number, "Frame: Token currently already rented");
+        require(tokenRental.rentalExpiryBlock == 0 || tokenRental.rentalExpiryBlock < block.number, "Frame: Token already rented");
         _;
     }
 
@@ -116,7 +113,7 @@ contract Frame is IVersionedContract, AccessControl, ReentrancyGuard, Rentable, 
         // Calculate rent
         uint256 rentalCostPerBlock = Rentable(this).getRentalPricePerBlock(_tokenId);
         uint256 rentalCost = (_rentalExpiryAtBlock - block.number) * rentalCostPerBlock;
-        require(msg.value >= rentalCost, "Frame: Rental payment not supplied");
+        require(msg.value >= rentalCost, "Frame: Rental payment");
 
         // Send to owner
         address payable tokenOwner = payable(ownerOf(_tokenId));
@@ -135,7 +132,7 @@ contract Frame is IVersionedContract, AccessControl, ReentrancyGuard, Rentable, 
 
     function _transfer(address payable _to, uint _amount) public {
         (bool success, ) = _to.call{value: _amount}("");
-        require(success, "Frame: Failed to send Ether");
+        require(success, "Frame: Failed to send ETH");
     }
 
     function setRentalPricePerBlock(uint256 _tokenId, uint256 _rentalPrice) external override tokenExists(_tokenId) tokenIsOwned(_tokenId, _msgSender()){
@@ -186,31 +183,15 @@ contract Frame is IVersionedContract, AccessControl, ReentrancyGuard, Rentable, 
     */
     constructor(
         string memory _name,
-        string memory _symbol
-    ) ERC721(_name, _symbol) {
-        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
-        _setupRole(MINTER_ROLE, _msgSender());
-        _setupRole(PAUSER_ROLE, _msgSender());
+        string memory _symbol,
+        string memory _baseTokenUri,
+        string memory _contractUri
+    ) ERC721PresetMinterPauserAutoId(_name, _symbol, _baseTokenUri) {
+        contractURI = _contractUri;
     }
 
-    function contractURI() public pure returns (string memory) {
-        
-        return "https://musee-dezental.com/storefront";
-
-        // This is for the OpenSea storefront and should return data in the following format
-        // {
-        //     "name": "OpenSea Creatures",
-        //     "description": "OpenSea Creatures are adorable aquatic beings primarily for demonstrating what can be done using the OpenSea platform",
-        //     "image": "https://openseacreatures.io/image.png",
-        //     "external_link": "https://openseacreatures.io",
-        //     "seller_fee_basis_points": 100, # Indicates a 1% seller fee.
-        //     "fee_recipient": "0xA97F337c39cccE66adfeCB2BF99C1DdC54C2D721" # Where seller fees will be paid to.
-        // }
-    }
-
-    function ownerMint(address _to, Category _category, uint256 _tokenId, string calldata _metadataURI) external onlyMinter(_msgSender()) nonReentrant {
+    function ownerMint(address _to, Category _category, uint256 _tokenId) external onlyMinter(_msgSender()) nonReentrant {
         _safeMint(_to, _tokenId);
-        _setTokenURI(_tokenId, _metadataURI);
         approve(address(this), _tokenId);
         CategoryDetail storage category = categories[_category];
         category.tokenIds.add(_tokenId);
@@ -221,18 +202,5 @@ contract Frame is IVersionedContract, AccessControl, ReentrancyGuard, Rentable, 
         category.price = _price;
         category.startingTokenId = _startingTokenId;
         category.supply = _supply;
-    }
-
-    /**
-     * @dev See {IERC165-supportsInterface}.
-     */
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        virtual
-        override(AccessControl, ERC721)
-        returns (bool)
-    {
-        return super.supportsInterface(interfaceId);
     }
 }

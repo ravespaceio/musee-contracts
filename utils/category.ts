@@ -1,25 +1,4 @@
-export const enum Category {
-	A,
-	B,
-	C,
-	D,
-	E,
-	F,
-	G,
-	H,
-	I,
-	J,
-	K,
-}
-
-export interface CategoryDetail {
-	category: number;
-	name: string;
-	floor: string;
-	price: string;
-	supply: number;
-	startingTokenId: number;
-}
+import { CategoryDetail, Category } from "./types";
 
 export const categories: CategoryDetail[] = [
 	{
