@@ -8,12 +8,29 @@ import "@openzeppelin/contracts/token/ERC721/presets/ERC721PresetMinterPauserAut
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-contract Frame is IVersionedContract, ReentrancyGuard, Rentable, Exhibitionable, ERC721PresetMinterPauserAutoId {
+contract Frame is
+    IVersionedContract,
+    ReentrancyGuard,
+    Rentable,
+    Exhibitionable,
+    ERC721PresetMinterPauserAutoId
+{
+    using EnumerableSet for EnumerableSet.UintSet;
+    string public contractURI;
 
-   using EnumerableSet for EnumerableSet.UintSet;  
-   string public contractURI;
-
-    enum Category {A,B,C,D,E,F,G,H,I,J,K} 
+    enum Category {
+        A,
+        B,
+        C,
+        D,
+        E,
+        F,
+        G,
+        H,
+        I,
+        J,
+        K
+    }
     struct CategoryDetail {
         uint256 price;
         uint256 startingTokenId;
@@ -43,7 +60,7 @@ contract Frame is IVersionedContract, ReentrancyGuard, Rentable, Exhibitionable,
     }
 
     /**
-    *  @notice Enforces a tokenId exists
+     *  @notice Enforces a tokenId exists
      */
     modifier tokenExists(uint256 _tokenId) {
         require(_exists(_tokenId), "ERC721: operator query for nonexistent token");
@@ -86,7 +103,7 @@ contract Frame is IVersionedContract, ReentrancyGuard, Rentable, Exhibitionable,
     /**
      * @notice Enforces a tokenId should be owned or rented by an address
      */
-    modifier tokenIsRentedOrOwned(uint256 _tokenId, address _address) {       
+    modifier tokenIsRentedOrOwned(uint256 _tokenId, address _address) {
         address owner = ownerOf(_tokenId);
         bool owned = owner == _address;
         Rental memory tokenRental = Rentable(this).getRenter(_tokenId);
@@ -98,9 +115,12 @@ contract Frame is IVersionedContract, ReentrancyGuard, Rentable, Exhibitionable,
     /**
      * @notice Enforces a token is not currently rented
      */
-    modifier tokenNotRented(uint256 _tokenId) {       
+    modifier tokenNotRented(uint256 _tokenId) {
         Rental memory tokenRental = Rentable(this).getRenter(_tokenId);
-        require(tokenRental.rentalExpiryBlock == 0 || tokenRental.rentalExpiryBlock < block.number, "Frame: Token already rented");
+        require(
+            tokenRental.rentalExpiryBlock == 0 || tokenRental.rentalExpiryBlock < block.number,
+            "Frame: Token already rented"
+        );
         _;
     }
 
@@ -108,8 +128,19 @@ contract Frame is IVersionedContract, ReentrancyGuard, Rentable, Exhibitionable,
      * @dev Rentable implementation overrides
      *
      */
-    function setRenter(uint256 _tokenId, address _renter, uint256 _rentalExpiryAtBlock) external override payable tokenExists(_tokenId) tokenNotRented(_tokenId) blockInFuture(_rentalExpiryAtBlock) nonReentrant {
-        
+    function setRenter(
+        uint256 _tokenId,
+        address _renter,
+        uint256 _rentalExpiryAtBlock
+    )
+        external
+        payable
+        override
+        tokenExists(_tokenId)
+        tokenNotRented(_tokenId)
+        blockInFuture(_rentalExpiryAtBlock)
+        nonReentrant
+    {
         // Calculate rent
         uint256 rentalCostPerBlock = Rentable(this).getRentalPricePerBlock(_tokenId);
         uint256 rentalCost = (_rentalExpiryAtBlock - block.number) * rentalCostPerBlock;
@@ -122,7 +153,7 @@ contract Frame is IVersionedContract, ReentrancyGuard, Rentable, Exhibitionable,
         // Send change to renter (if any)
         uint256 change = msg.value - rentalCost;
         address payable renter = payable(_msgSender());
-        if(change > 0){
+        if (change > 0) {
             _transfer(renter, change);
         }
 
@@ -130,24 +161,38 @@ contract Frame is IVersionedContract, ReentrancyGuard, Rentable, Exhibitionable,
         Rentable(this).setRenter(_tokenId, _renter, _rentalExpiryAtBlock);
     }
 
-    function _transfer(address payable _to, uint _amount) public {
+    function _transfer(address payable _to, uint256 _amount) public {
         (bool success, ) = _to.call{value: _amount}("");
         require(success, "Frame: Failed to send ETH");
     }
 
-    function setRentalPricePerBlock(uint256 _tokenId, uint256 _rentalPrice) external override tokenExists(_tokenId) tokenIsOwned(_tokenId, _msgSender()){
+    function setRentalPricePerBlock(uint256 _tokenId, uint256 _rentalPrice)
+        external
+        override
+        tokenExists(_tokenId)
+        tokenIsOwned(_tokenId, _msgSender())
+    {
         Rentable(this).setRentalPricePerBlock(_tokenId, _rentalPrice);
     }
-     
+
     /**
      * @dev Exhibitionable implementation overrides
      *
      */
-    function setExhibit(uint256 _tokenId, address _exhibitContractAddress, uint256 _exhibitTokenId) external override tokenExists(_tokenId) tokenIsRentedOrOwned(_tokenId, _msgSender()){
+    function setExhibit(
+        uint256 _tokenId,
+        address _exhibitContractAddress,
+        uint256 _exhibitTokenId
+    ) external override tokenExists(_tokenId) tokenIsRentedOrOwned(_tokenId, _msgSender()) {
         Exhibitionable(this).setExhibit(_tokenId, _exhibitContractAddress, _exhibitTokenId);
     }
 
-    function clearExhibit(uint256 _tokenId) external override tokenExists(_tokenId) tokenIsRentedOrOwned(_tokenId, _msgSender()){
+    function clearExhibit(uint256 _tokenId)
+        external
+        override
+        tokenExists(_tokenId)
+        tokenIsRentedOrOwned(_tokenId, _msgSender())
+    {
         Exhibitionable(this).clearExhibit(_tokenId);
     }
 
@@ -155,18 +200,18 @@ contract Frame is IVersionedContract, ReentrancyGuard, Rentable, Exhibitionable,
      * @dev Sale functions
      *
      */
- 
-    function randMod(uint256 _modulus) internal returns(uint256)  {
-        randNonce++; 
-        return uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, randNonce))) % _modulus;
+
+    function randMod(uint256 _modulus) internal returns (uint256) {
+        randNonce++;
+        return
+            uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, randNonce))) % _modulus;
     }
 
     function purchase(Category _category) external payable nonReentrant {
-        
         CategoryDetail storage category = categories[_category];
-        
+
         require(category.tokenIds.length() > 0, "Frame: Sold out");
-        require(msg.value >= category.price, "Frame: Not paid enough");        
+        require(msg.value >= category.price, "Frame: Not paid enough");
 
         // Note: this randomizer function is not safe and is only used temporarily for test purposes
         // Will be updated with Chainlink VRF - https://docs.chain.link/docs/chainlink-vrf/
@@ -180,7 +225,7 @@ contract Frame is IVersionedContract, ReentrancyGuard, Rentable, Exhibitionable,
     /**
      * @dev Grants `DEFAULT_ADMIN_ROLE`, `MINTER_ROLE` and `PAUSER_ROLE` to the
      * account that deploys the contract.
-    */
+     */
     constructor(
         string memory _name,
         string memory _symbol,
@@ -190,14 +235,23 @@ contract Frame is IVersionedContract, ReentrancyGuard, Rentable, Exhibitionable,
         contractURI = _contractUri;
     }
 
-    function ownerMint(address _to, Category _category, uint256 _tokenId) external onlyMinter(_msgSender()) nonReentrant {
+    function ownerMint(
+        address _to,
+        Category _category,
+        uint256 _tokenId
+    ) external onlyMinter(_msgSender()) nonReentrant {
         _safeMint(_to, _tokenId);
         approve(address(this), _tokenId);
         CategoryDetail storage category = categories[_category];
         category.tokenIds.add(_tokenId);
     }
 
-    function setCategoryDetail(Category _category, uint256 _price, uint256 _startingTokenId, uint256 _supply) external onlyOwner(_msgSender()) {
+    function setCategoryDetail(
+        Category _category,
+        uint256 _price,
+        uint256 _startingTokenId,
+        uint256 _supply
+    ) external onlyOwner(_msgSender()) {
         CategoryDetail storage category = categories[_category];
         category.price = _price;
         category.startingTokenId = _startingTokenId;
