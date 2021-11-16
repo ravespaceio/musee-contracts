@@ -64,9 +64,18 @@ export default {
       allowUnlimitedContractSize: true,
       gas: "auto",
       gasPrice: "auto",
+      timeout: 600000
     }
   },
-  solidity: "0.8.4",
+  solidity: { 
+    version: "0.8.4",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200
+      }
+    }
+  },
   namedAccounts: {
     deployer: {
       default: 0

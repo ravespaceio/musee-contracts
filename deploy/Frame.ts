@@ -51,7 +51,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 		"./utils/metadata",
 		"/*"
 	);
-	const tokenUri = `ipfs://${metadataFolder.cid}`;
+	const tokenUri = `ipfs://${metadataFolder.cid}/`;
 
 	// Deploy contract
 	const FrameDeploy = await deploy("Frame", {
