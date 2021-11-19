@@ -268,7 +268,7 @@ contract Frame is
         category.supply = _supply;
 
         uint256 j;
-        for (j = _startingTokenId; j < _startingTokenId + _supply; j++) {
+        for (j = _startingTokenId; j < (_startingTokenId + _supply); j++) {
             category.tokenIds.add(j);
         }
     }
@@ -304,7 +304,7 @@ contract Frame is
         uint256 tokenIdToAllocate;
 
         if (tokensReminingInCategory > 1)
-            tokenIdToAllocate = randomNumber % tokensReminingInCategory;
+            tokenIdToAllocate = category.tokenIds.at(randomNumber % tokensReminingInCategory);
         else tokenIdToAllocate = category.tokenIds.at(0);
 
         category.tokenIds.remove(tokenIdToAllocate);
