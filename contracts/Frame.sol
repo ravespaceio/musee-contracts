@@ -4,6 +4,7 @@ pragma solidity ^0.8.4;
 import "./abstract/Rentable.sol";
 import "./abstract/Exhibitionable.sol";
 import "./interface/IVersionedContract.sol";
+import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 import "@openzeppelin/contracts/token/ERC721/presets/ERC721PresetMinterPauserAutoId.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -13,7 +14,8 @@ contract Frame is
     ReentrancyGuard,
     Rentable,
     Exhibitionable,
-    ERC721PresetMinterPauserAutoId
+    ERC721PresetMinterPauserAutoId,
+    VRFConsumerBase
 {
     using EnumerableSet for EnumerableSet.UintSet;
     string public contractURI;
@@ -37,9 +39,24 @@ contract Frame is
         uint256 supply;
         EnumerableSet.UintSet tokenIds;
     }
-    mapping(Category => CategoryDetail) private categories;
+    mapping(Category => CategoryDetail) internal categories;
+    mapping(bytes32 => address) public requestIdToSender;
+    mapping(bytes32 => Category) public requestIdToCategory;
+    mapping(bytes32 => uint256) public requestIdToTokenId;
 
-    uint256 randNonce = 0;
+    uint256 internal randNonce = 0;
+    bytes32 internal keyHash;
+    uint256 internal fee = 0.1 * 10**18; // 0.1 LINK (Varies by network)
+    bool internal categoriesInitialized = false;
+
+    event MintRequest(bytes32 indexed _requestId, address indexed _address);
+    event MintFulfilled(
+        bytes32 indexed _requestId,
+        address indexed _address,
+        uint256 indexed _tokenId
+    );
+    event LinkWithdrawn(address indexed _to, uint256 _value);
+    event EtherWithdrawn(address indexed _to, uint256 _value);
 
     /**
      * @notice Returns the storage, major, minor, and patch version of the contract.
@@ -56,7 +73,24 @@ contract Frame is
             uint256
         )
     {
-        return (1, 0, 1, 1);
+        return (1, 0, 2, 0);
+    }
+
+    /**
+     *  @notice Enforces categories have been initialized
+     */
+    modifier categoriesReady() {
+        require(categoriesInitialized, "Frame: Not ready");
+        _;
+    }
+
+    /**
+     *  @notice Enforces a valid category
+     */
+    modifier validCategory(Category category) {
+        require(category <= Category.K, "Frame: Invalid Category");
+        require(category >= Category.A, "Frame: Invalid Category");
+        _;
     }
 
     /**
@@ -161,7 +195,7 @@ contract Frame is
         Rentable(this).setRenter(_tokenId, _renter, _rentalExpiryAtBlock);
     }
 
-    function _transfer(address payable _to, uint256 _amount) public {
+    function _transfer(address payable _to, uint256 _amount) internal {
         (bool success, ) = _to.call{value: _amount}("");
         require(success, "Frame: Failed to send ETH");
     }
@@ -197,32 +231,6 @@ contract Frame is
     }
 
     /**
-     * @dev Sale functions
-     *
-     */
-
-    function randMod(uint256 _modulus) internal returns (uint256) {
-        randNonce++;
-        return
-            uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, randNonce))) % _modulus;
-    }
-
-    function purchase(Category _category) external payable nonReentrant {
-        CategoryDetail storage category = categories[_category];
-
-        require(category.tokenIds.length() > 0, "Frame: Sold out");
-        require(msg.value >= category.price, "Frame: Not paid enough");
-
-        // Note: this randomizer function is not safe and is only used temporarily for test purposes
-        // Will be updated with Chainlink VRF - https://docs.chain.link/docs/chainlink-vrf/
-
-        uint256 selection = randMod(category.tokenIds.length());
-        uint256 tokenToTransfer = category.tokenIds.at(selection);
-        _transfer(address(this), _msgSender(), tokenToTransfer);
-        category.tokenIds.remove(tokenToTransfer);
-    }
-
-    /**
      * @dev Grants `DEFAULT_ADMIN_ROLE`, `MINTER_ROLE` and `PAUSER_ROLE` to the
      * account that deploys the contract.
      */
@@ -230,20 +238,22 @@ contract Frame is
         string memory _name,
         string memory _symbol,
         string memory _baseTokenUri,
-        string memory _contractUri
-    ) ERC721PresetMinterPauserAutoId(_name, _symbol, _baseTokenUri) {
+        string memory _contractUri,
+        address _vrfCoordinator,
+        address _link,
+        bytes32 _keyHash,
+        uint256 _fee
+    )
+        ERC721PresetMinterPauserAutoId(_name, _symbol, _baseTokenUri)
+        VRFConsumerBase(_vrfCoordinator, _link)
+    {
+        // Used to generate a metadata location for the entire contract
+        // commonly used on secondary marketplaces like OpenSea to display collection information
         contractURI = _contractUri;
-    }
 
-    function ownerMint(
-        address _to,
-        Category _category,
-        uint256 _tokenId
-    ) external onlyMinter(_msgSender()) nonReentrant {
-        _safeMint(_to, _tokenId);
-        approve(address(this), _tokenId);
-        CategoryDetail storage category = categories[_category];
-        category.tokenIds.add(_tokenId);
+        // Used to requestRandomness from VRFConsumerBase
+        fee = _fee;
+        keyHash = _keyHash;
     }
 
     function setCategoryDetail(
@@ -251,10 +261,71 @@ contract Frame is
         uint256 _price,
         uint256 _startingTokenId,
         uint256 _supply
-    ) external onlyOwner(_msgSender()) {
+    ) external onlyOwner(_msgSender()) validCategory(_category) {
         CategoryDetail storage category = categories[_category];
         category.price = _price;
         category.startingTokenId = _startingTokenId;
         category.supply = _supply;
+
+        uint256 j;
+        for (j = _startingTokenId; j < _startingTokenId + _supply; j++) {
+            category.tokenIds.add(j);
+        }
+    }
+
+    function setCategoriesInitialized() external onlyOwner(_msgSender()) {
+        categoriesInitialized = true;
+    }
+
+    function mint(Category _category)
+        external
+        payable
+        categoriesReady
+        validCategory(_category)
+        nonReentrant
+    {
+        CategoryDetail storage category = categories[_category];
+        require(category.tokenIds.length() > 0, "Frame: Sold out");
+        require(msg.value == category.price, "Frame: Incorrect payment for category");
+        require(LINK.balanceOf(address(this)) >= fee, "Frame: Not enough LINK");
+
+        bytes32 requestId = requestRandomness(keyHash, fee);
+        requestIdToSender[requestId] = _msgSender();
+        requestIdToCategory[requestId] = _category;
+
+        emit MintRequest(requestId, _msgSender());
+    }
+
+    function fulfillRandomness(bytes32 requestId, uint256 randomNumber) internal override {
+        address minter = requestIdToSender[requestId];
+        CategoryDetail storage category = categories[requestIdToCategory[requestId]];
+
+        uint256 tokensReminingInCategory = category.tokenIds.length();
+        uint256 tokenIdToAllocate;
+
+        if (tokensReminingInCategory > 1)
+            tokenIdToAllocate = randomNumber % tokensReminingInCategory;
+        else tokenIdToAllocate = category.tokenIds.at(0);
+
+        category.tokenIds.remove(tokenIdToAllocate);
+        requestIdToTokenId[requestId] = tokenIdToAllocate;
+        _safeMint(minter, tokenIdToAllocate);
+
+        emit MintFulfilled(requestId, minter, tokenIdToAllocate);
+    }
+
+    function withdrawAllLink(address payable _to) external onlyOwner(_msgSender()) nonReentrant {
+        uint256 linkBalance = LINK.balanceOf(address(this));
+        require(LINK.transfer(_msgSender(), linkBalance), "Frame: Error sending LINK");
+        emit LinkWithdrawn(_to, linkBalance);
+    }
+
+    function withdrawEther(address payable _to, uint256 _value)
+        external
+        onlyOwner(_msgSender())
+        nonReentrant
+    {
+        _transfer(_to, _value);
+        emit EtherWithdrawn(_to, _value);
     }
 }
