@@ -277,7 +277,7 @@ contract Frame is
         categoriesInitialized = true;
     }
 
-    function mint(Category _category)
+    function mintFrame(Category _category)
         external
         payable
         categoriesReady
