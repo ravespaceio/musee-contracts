@@ -3,7 +3,7 @@ import { IPFSFolder } from "../utils/types";
 import { pinDirectoryToIPFS, postToArweave } from "../utils/IPFS";
 const JEST_TIMEOUT = 600000; // ten minutes
 
-describe("IPFS upload and pinning...", () => {
+describe.skip("IPFS upload and pinning...", () => {
 
     let images: IPFSFolder;
     let metadata: IPFSFolder;
@@ -32,4 +32,5 @@ describe("IPFS upload and pinning...", () => {
         expect(metadata).to.have.property("files");
         expect(metadata).to.have.property("file");
 	});
-}).timeout(JEST_TIMEOUT);
+
+})//.timeout(JEST_TIMEOUT);

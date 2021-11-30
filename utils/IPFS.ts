@@ -39,9 +39,9 @@ export async function pinDirectoryToIPFS(
 		const baseDirectory = convertFilePathToBaseDirectoryPath(src, file);
 		let fileStream: fs.ReadStream = fs.createReadStream(file);
 		const fileHash = await ipfsOnlyHash.of(fileStream);
-		log(
-			`Processing file ${file} with base directory ${baseDirectory} and hash ${fileHash}`
-		);
+		// log(
+		// 	`Processing file ${file} with base directory ${baseDirectory} and hash ${fileHash}`
+		// );
 		files.push({ file: file, cid: fileHash });
 		fileStream = fs.createReadStream(file);
 
@@ -99,7 +99,7 @@ export async function postToArweave(ipfsHash: string): Promise<any> {
 		const response = await instance.post(
 			`https://ipfs2arweave.com/permapin/${ipfsHash}`
 		);
-		log(`Posted to Arweave, result ${JSON.stringify(response.data)}`);
+		// log(`Posted to Arweave, result ${JSON.stringify(response.data)}`);
 		return response.data;
 	} catch (err) {
 		log(err);
