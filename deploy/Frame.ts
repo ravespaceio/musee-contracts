@@ -1,7 +1,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { parseEther } from "@ethersproject/units";
-import { BigNumberish, Contract } from "ethers";
+import { Contract } from "ethers";
 import { categories } from "../utils/category";
 import { CategoryDetail, ERC721Metadata, IPFSFolder } from "../utils/types";
 import { pinDirectoryToIPFS } from "../utils/IPFS";
@@ -10,38 +10,80 @@ import { getRandomMetadata, writeJSONFile } from "../utils/metadata";
 const pinataKey: string = process.env.PINATA_KEY || "undefined";
 const pinataSecret: string = process.env.PINATA_SECRET || "undefined";
 
-// Rinkeby settings
-const VRF_COORDINATOR = "0xb3dCcb4Cf7a26f6cf6B120Cf5A73875B7BBc655B";
-const LINK = "0x01BE23585060835E02B77ef475b0Cc51aA1e0709";
-const KEYHASH =
-	"0x2ed0feb3e7fd2022120aa84fab1945545a9f2ffc9076fd6156fa96eaff4c1311";
-const FEE: BigNumberish = parseEther("0.1"); // 0.1 LINK fee
-
-async function constructFrame(
-	Frame: Contract,
-	deployer: string,
-	category: CategoryDetail,
-	tokenId: number,
-	retryCount: number
-): Promise<void> {
-	try {
-		if (retryCount > 0) {
-			retryCount--;
-			await Frame.constructFrame(deployer, category.category, tokenId);
-		} else throw `Failed constructing ${tokenId}`;
-	} catch (err) {
-		console.log(
-			`Error constructing ${tokenId} to ${deployer}, retrying ${retryCount} more times...`
-		);
-		await constructFrame(Frame, deployer, category, tokenId, retryCount);
-	}
-}
+// async function constructFrame(
+// 	Frame: Contract,
+// 	deployer: string,
+// 	category: CategoryDetail,
+// 	tokenId: number,
+// 	retryCount: number
+// ): Promise<void> {
+// 	try {
+// 		if (retryCount > 0) {
+// 			retryCount--;
+// 			await Frame.constructFrame(deployer, category.category, tokenId);
+// 		} else throw `Failed constructing ${tokenId}`;
+// 	} catch (err) {
+// 		console.log(
+// 			`Error constructing ${tokenId} to ${deployer}, retrying ${retryCount} more times...`
+// 		);
+// 		await constructFrame(Frame, deployer, category, tokenId, retryCount);
+// 	}
+// }
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	// @ts-ignore
-	const { deployments, getNamedAccounts, ethers } = hre;
+	const { deployments, getNamedAccounts, ethers, getChainId } = hre;
 	const { deploy } = deployments;
 	const { deployer } = await getNamedAccounts();
+	const chainID = await getChainId();
+
+	let vrfCoordinatorAddress: string,
+		vrfCoordinatorKeyHash: string,
+		vrfCoordinatorFee: string,
+		linkAddress: string;
+
+	switch (chainID) {
+		// Mainnet
+		case "1": {
+			linkAddress = "0x514910771AF9Ca656af840dff83E8264EcF986CA";
+			vrfCoordinatorAddress =
+				"0xf0d54349aDdcf704F77AE15b96510dEA15cb7952";
+			vrfCoordinatorKeyHash =
+				"0xAA77729D3466CA35AE8D28B3BBAC7CC36A5031EFDC430821C02BC31A238AF445";
+			vrfCoordinatorFee = "2.0";
+			break;
+		}
+		// Rinkeby
+		case "4": {
+			linkAddress = "0x01BE23585060835E02B77ef475b0Cc51aA1e0709";
+			vrfCoordinatorAddress =
+				"0xb3dCcb4Cf7a26f6cf6B120Cf5A73875B7BBc655B";
+			vrfCoordinatorKeyHash =
+				"0x2ed0feb3e7fd2022120aa84fab1945545a9f2ffc9076fd6156fa96eaff4c1311";
+			vrfCoordinatorFee = "0.1";
+			break;
+		}
+		default: {
+			// If no real network specified, create our own LINK Token
+			const result1 = await deploy("LinkMock", {
+				from: deployer,
+				args: ["LINK", "LINK"],
+				log: true,
+			});
+			linkAddress = result1.address;
+
+			// If no real network specified, create our own VRFCoordinator
+			const result2 = await deploy("VRFCoordinatorMock", {
+				from: deployer,
+				args: [],
+				log: true,
+			});
+			vrfCoordinatorAddress = result2.address;
+			vrfCoordinatorKeyHash =
+				"0x0000000000000000000000000000000000000000000000000000000000000001";
+			vrfCoordinatorFee = "2.0";
+		}
+	}
 
 	// Upload images
 	console.log(`Uploading images to IPFS and Arweave...`);
@@ -57,17 +99,17 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	for (let i = 0; i < categories.length; i++) {
 		const category: CategoryDetail = categories[i];
 
-		console.log(`Processing category ${JSON.stringify(categories[i])}`);
+		console.log(`Processing category ${JSON.stringify(category)}`);
 
-		for (let j = 0; j < categories[i].supply; j++) {
-			const tokenId = categories[i].startingTokenId + j;
+		for (let j = 0; j < category.supply; j++) {
+			const tokenId = category.startingTokenId + j;
 			const metadata: ERC721Metadata = getRandomMetadata(
 				tokenId,
 				categories[i],
 				imageFolder.files
 			);
 
-			console.log(`Writing metadata for tokenId ${tokenId} to file ...`);
+			// console.log(`Writing metadata for tokenId ${tokenId} to file ...`);
 			await writeJSONFile(metadata, `${tokenId}`, "./utils/metadata");
 		}
 	}
@@ -89,10 +131,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 			"FRAME",
 			tokenUri,
 			"https://musee-dezental.com/storefront",
-			VRF_COORDINATOR,
-			LINK,
-			KEYHASH,
-			FEE,
+			vrfCoordinatorAddress,
+			linkAddress,
+			vrfCoordinatorKeyHash,
+			parseEther(vrfCoordinatorFee),
 		],
 		log: true,
 	});
@@ -101,6 +143,24 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 		"Frame",
 		FrameDeploy.address
 	);
+
+	// Configure test settings
+	if (chainID !== "1" && chainID !== "4") {
+		// Send LINK to Frame contract
+		const Link: Contract = await ethers.getContractAt(
+			"LinkMock",
+			linkAddress
+		);
+		await Link.mint(Frame.address, parseEther("1000000.0"));
+		console.log("Minted LINK to Frame...");
+
+		const VRF: Contract = await ethers.getContractAt(
+			"VRFCoordinatorMock",
+			vrfCoordinatorAddress
+		);
+		await VRF.setVrfConsumerAddress(Frame.address);
+		console.log("Set vrfConsumerAdddress on VRFCoordinatorMock...");
+	}
 
 	// Configure categories
 	console.log(`Configuring categories...`);
@@ -125,4 +185,5 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 };
 
 export default func;
-func.tags = ["NFT", "Token"];
+func.dependencies = ["LINK", "VRFCoordinator"];
+func.tags = ["NFT", "Token", "Frame"];

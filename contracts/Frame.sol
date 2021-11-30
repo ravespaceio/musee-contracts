@@ -6,6 +6,7 @@ import "./abstract/Exhibitionable.sol";
 import "./interface/IVersionedContract.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 import "@openzeppelin/contracts/token/ERC721/presets/ERC721PresetMinterPauserAutoId.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
@@ -44,7 +45,6 @@ contract Frame is
     mapping(bytes32 => Category) public requestIdToCategory;
     mapping(bytes32 => uint256) public requestIdToTokenId;
 
-    uint256 internal randNonce = 0;
     bytes32 internal keyHash;
     uint256 internal fee = 0.1 * 10**18; // 0.1 LINK (Varies by network)
     bool internal categoriesInitialized = false;
@@ -105,7 +105,7 @@ contract Frame is
      * @notice Enforces a block value is in the future
      */
     modifier blockInFuture(uint256 _block) {
-        require(_block > block.timestamp, "Frame: Block not in future");
+        require(_block > block.number, "Frame: Block not in future");
         _;
     }
 
@@ -129,20 +129,30 @@ contract Frame is
      * @notice Enforces a tokenId should be owned by an address
      */
     modifier tokenIsOwned(uint256 _tokenId, address _address) {
-        address owner = ownerOf(_tokenId);
-        require(owner == _address, "Frame: Token not owned");
+        require(_tokenIsOwned(_tokenId, _address), "Frame: Not the Owner");
         _;
     }
 
     /**
-     * @notice Enforces a tokenId should be owned or rented by an address
+     * @notice Enforces a tokenId should rented by an address
      */
-    modifier tokenIsRentedOrOwned(uint256 _tokenId, address _address) {
-        address owner = ownerOf(_tokenId);
-        bool owned = owner == _address;
-        Rental memory tokenRental = Rentable(this).getRenter(_tokenId);
-        bool rented = tokenRental.renter == _address;
-        require(owned || rented, "Frame: Token not owned / rented");
+    modifier tokenIsRented(uint256 _tokenId, address _address) {
+        require(_tokenIsRented(_tokenId, _address), "Frame: Not the Renter");
+        _;
+    }
+
+    /**
+     * @notice Enforces an Exhibit is owned by the user
+     */
+    modifier ownsNFT(
+        address _exhibitor,
+        address _exhibitContractAddress,
+        uint256 _exhibitTokenId
+    ) {
+        require(
+            IERC721(_exhibitContractAddress).ownerOf(_exhibitTokenId) == _exhibitor,
+            "Frame: Exhibit not owned"
+        );
         _;
     }
 
@@ -150,12 +160,53 @@ contract Frame is
      * @notice Enforces a token is not currently rented
      */
     modifier tokenNotRented(uint256 _tokenId) {
-        Rental memory tokenRental = Rentable(this).getRenter(_tokenId);
-        require(
-            tokenRental.rentalExpiryBlock == 0 || tokenRental.rentalExpiryBlock < block.number,
-            "Frame: Token already rented"
-        );
+        require(!_isCurrentlyRented(_tokenId), "Frame: Token already rented");
         _;
+    }
+
+    /**
+     * @notice Enforces a token has a rentalPricePerBlock configured
+     */
+    modifier rentalPriceSet(uint256 _tokenId) {
+        require(Rentable(this).getRentalPricePerBlock(_tokenId) > 0, "Frame: Rental price not set");
+        _;
+    }
+
+    /**
+     * @notice Checks if a token is currently owned by
+     * @param _tokenId The token to check is owned
+     * @param _address The address to check if it's owned by
+     */
+    function _tokenIsOwned(uint256 _tokenId, address _address) internal view returns (bool) {
+        return _address == ownerOf(_tokenId);
+    }
+
+    /**
+     * @notice Checks if a token is currently rented by
+     * @param _tokenId The token to check is rented
+     * @param _address The address to check if it's rented by
+     */
+    function _tokenIsRented(uint256 _tokenId, address _address) internal view returns (bool) {
+        Rental memory tokenRental = Rentable(this).getRenter(_tokenId);
+        return tokenRental.renter == _address;
+    }
+
+    /**
+     * @notice Checks if a token is currently rented by anyone
+     * @param _tokenId The token to check is rented
+     */
+    function isCurrentlyRented(uint256 _tokenId) public view returns (bool) {
+        return _isCurrentlyRented(_tokenId);
+    }
+
+    /**
+     * @notice Checks if a token is currently rented
+     * @param _tokenId The token to check is rented
+     */
+    function _isCurrentlyRented(uint256 _tokenId) internal view returns (bool) {
+        Rental memory tokenRental = Rentable(this).getRenter(_tokenId);
+        return
+            (tokenRental.rentalExpiryBlock != 0) || (tokenRental.rentalExpiryBlock > block.number);
     }
 
     /**
@@ -173,6 +224,7 @@ contract Frame is
         tokenExists(_tokenId)
         tokenNotRented(_tokenId)
         blockInFuture(_rentalExpiryAtBlock)
+        rentalPriceSet(_tokenId)
         nonReentrant
     {
         // Calculate rent
@@ -217,7 +269,19 @@ contract Frame is
         uint256 _tokenId,
         address _exhibitContractAddress,
         uint256 _exhibitTokenId
-    ) external override tokenExists(_tokenId) tokenIsRentedOrOwned(_tokenId, _msgSender()) {
+    )
+        external
+        override
+        tokenExists(_tokenId)
+        ownsNFT(_msgSender(), _exhibitContractAddress, _exhibitTokenId)
+    {
+        if (_isCurrentlyRented(_tokenId)){
+            require(_tokenIsRented(_tokenId, _msgSender()), "Frame: Not the Renter");
+        }                   
+        else {
+            require(_tokenIsOwned(_tokenId, _msgSender()), "Frame: Not the Owner");
+        }
+
         Exhibitionable(this).setExhibit(_tokenId, _exhibitContractAddress, _exhibitTokenId);
     }
 
@@ -225,8 +289,14 @@ contract Frame is
         external
         override
         tokenExists(_tokenId)
-        tokenIsRentedOrOwned(_tokenId, _msgSender())
+
     {
+        if (_isCurrentlyRented(_tokenId)){
+            require(_tokenIsRented(_tokenId, _msgSender()), "Frame: Not the Renter");
+        }                   
+        else {
+            require(_tokenIsOwned(_tokenId, _msgSender()), "Frame: Not the Owner");
+        }
         Exhibitionable(this).clearExhibit(_tokenId);
     }
 

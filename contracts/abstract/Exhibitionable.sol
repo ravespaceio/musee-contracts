@@ -5,7 +5,6 @@ import "../interface/IExhibitionable.sol";
 
 abstract contract Exhibitionable is IExhibitionable {
     // Mapping of tokenId to current Exhibit
-    // Defaulted to 0x0
     mapping(uint256 => Exhibit) private _exhibits;
 
     function setExhibit(

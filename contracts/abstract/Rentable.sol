@@ -5,11 +5,9 @@ import "../interface/IRentable.sol";
 
 abstract contract Rentable is IRentable {
     // Mapping of tokenId to current rentalPrice
-    // Defaulted to paying back the entire purchase cost in 1 year
     mapping(uint256 => uint256) public _rentalPrices;
 
     // Mapping of tokenId to current Rental
-    // Defaulted to 0x0
     mapping(uint256 => Rental) private _renters;
 
     function setRenter(
