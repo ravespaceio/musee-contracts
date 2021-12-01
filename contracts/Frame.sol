@@ -6,7 +6,6 @@ import "./abstract/Exhibitionable.sol";
 import "./interface/IVersionedContract.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 import "@openzeppelin/contracts/token/ERC721/presets/ERC721PresetMinterPauserAutoId.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
@@ -144,15 +143,12 @@ contract Frame is
     /**
      * @notice Enforces an Exhibit is owned by the user
      */
-    modifier ownsNFT(
+    modifier ownsExhibit(
         address _exhibitor,
         address _exhibitContractAddress,
         uint256 _exhibitTokenId
     ) {
-        require(
-            IERC721(_exhibitContractAddress).ownerOf(_exhibitTokenId) == _exhibitor,
-            "Frame: Exhibit not owned"
-        );
+        require(Exhibitionable(this).exhibitIsOwnedBy(_exhibitor, _exhibitContractAddress, _exhibitTokenId), "Frame: Exhibit not owned");
         _;
     }
 
@@ -244,7 +240,7 @@ contract Frame is
         }
 
         // Rent
-        Rentable(this).setRenter(_tokenId, _renter, _rentalExpiryAtBlock);
+        _setRenter(_tokenId, _renter, _rentalExpiryAtBlock);
     }
 
     function _transfer(address payable _to, uint256 _amount) internal {
@@ -258,7 +254,15 @@ contract Frame is
         tokenExists(_tokenId)
         tokenIsOwned(_tokenId, _msgSender())
     {
-        Rentable(this).setRentalPricePerBlock(_tokenId, _rentalPrice);
+        _setRentalPricePerBlock(_tokenId, _rentalPrice);
+    }
+
+    function _verifyOwnership(address _ownerOrRenter, uint256 _tokenId) internal view returns (bool) {
+        if (_isCurrentlyRented(_tokenId)) {
+            require(_tokenIsRented(_tokenId, _ownerOrRenter), "Frame: Not the Renter");
+        } else {
+            require(_tokenIsOwned(_tokenId, _ownerOrRenter), "Frame: Not the Owner");
+        }
     }
 
     /**
@@ -273,31 +277,16 @@ contract Frame is
         external
         override
         tokenExists(_tokenId)
-        ownsNFT(_msgSender(), _exhibitContractAddress, _exhibitTokenId)
+        ownsExhibit(_msgSender(), _exhibitContractAddress, _exhibitTokenId)
+        nonReentrant
     {
-        if (_isCurrentlyRented(_tokenId)){
-            require(_tokenIsRented(_tokenId, _msgSender()), "Frame: Not the Renter");
-        }                   
-        else {
-            require(_tokenIsOwned(_tokenId, _msgSender()), "Frame: Not the Owner");
-        }
-
-        Exhibitionable(this).setExhibit(_tokenId, _exhibitContractAddress, _exhibitTokenId);
+        _verifyOwnership(_msgSender(), _tokenId);
+        _setExhibit(_tokenId, _exhibitContractAddress, _exhibitTokenId);
     }
 
-    function clearExhibit(uint256 _tokenId)
-        external
-        override
-        tokenExists(_tokenId)
-
-    {
-        if (_isCurrentlyRented(_tokenId)){
-            require(_tokenIsRented(_tokenId, _msgSender()), "Frame: Not the Renter");
-        }                   
-        else {
-            require(_tokenIsOwned(_tokenId, _msgSender()), "Frame: Not the Owner");
-        }
-        Exhibitionable(this).clearExhibit(_tokenId);
+    function clearExhibit(uint256 _tokenId) external override tokenExists(_tokenId) nonReentrant {
+        _verifyOwnership(_msgSender(), _tokenId);
+        _clearExhibit(_tokenId);
     }
 
     /**

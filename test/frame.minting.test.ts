@@ -10,6 +10,7 @@ import * as ethersTypes from "ethers";
 
 import { Category } from "../utils/types";
 import { categories } from "../utils/category";
+import { BigNumberish } from "ethers";
 
 chai.use(chaiAsPromised);
 const expect = chai.expect;
@@ -20,6 +21,7 @@ let minter2: SignerWithAddress;
 let minter3: SignerWithAddress;
 let Frame: ethersTypes.Contract;
 let VRFCoordinator: ethersTypes.Contract;
+let ExhibitMock: ethersTypes.Contract;
 
 const deploy = deployments.createFixture(async () => {
 	
@@ -41,6 +43,10 @@ const deploy = deployments.createFixture(async () => {
 		(await deployments.get("VRFCoordinatorMock")).address
 	);
 
+	ExhibitMock = await ethers.getContractAt(
+		"ERC721Mock",
+		(await deployments.get("ERC721Mock")).address
+	);
 });
 
 function getRandomInt(min:number, max:number) : number {
@@ -157,7 +163,7 @@ describe("Frame Minting", () => {
 
 });
 
-describe.skip("Frame Exhibiting", () => {
+describe("Frame Exhibiting", () => {
 
     before(async function () {});
 
@@ -166,17 +172,72 @@ describe.skip("Frame Exhibiting", () => {
 	});
 	
 	it("should set and Exhibit on an owned Frame for another owned ERC-721 compatible NFT", async function () {
-		const exhibitTokenId = await mintAndFulfil(Category.K, minter1);
+		await ExhibitMock.connect(owner).mint(minter1.address);
+		const exhibitTokenId = 0;
 		const frameTokenId = await mintAndFulfil(Category.K, minter1);
-		const balanceOf = await Frame.balanceOf(minter1.address);
-		console.log(`frameTokenId ${frameTokenId}, exhibitTokenId ${exhibitTokenId}, balanceOf ${balanceOf}`);
-		await expect(Frame.connect(minter1).setExhibit(frameTokenId, Frame.address, exhibitTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, Frame.address, exhibitTokenId);
+		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitMock.address, exhibitTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, ExhibitMock.address, exhibitTokenId);
+    });
+	
+	it("should set and Exhibit on an owned Frame for another owned ERC-721 compatible NFT and then clear it", async function () {
+		await ExhibitMock.connect(owner).mint(minter1.address);
+		const exhibitTokenId = 0;
+		const frameTokenId = await mintAndFulfil(Category.K, minter1);
+		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitMock.address, exhibitTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, ExhibitMock.address, exhibitTokenId);
+		await expect(Frame.connect(minter1).clearExhibit(frameTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, "0x0000000000000000000000000000000000000000", 0);
     });
 
 	it("should fail to set Exhibit on an owned Frame for an ERC-721 compatible NFT not owned by the Frame owner", async function () {
-		const exhibitTokenId = await mintAndFulfil(Category.K, minter2);
+		await ExhibitMock.connect(owner).mint(minter2.address);
+		const exhibitTokenId = 0;
 		const frameTokenId = await mintAndFulfil(Category.K, minter1);
-		await expect(Frame.connect(minter1).setExhibit(frameTokenId, Frame.address, exhibitTokenId)).to.be.revertedWith("Frame: Exhibit not owned");
+		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitMock.address, exhibitTokenId)).to.be.revertedWith("Frame: Exhibit not owned");
+    });
+
+});
+
+describe("Frame Renting", () => {
+
+    before(async function () {});
+
+	beforeEach(async () => {
+		await deploy();
+	});
+	
+	it("should mint a Frame and set the rentalPricePerBlock on it", async function () {
+		const frameTokenId = await mintAndFulfil(Category.K, minter1);
+		await Frame.connect(minter1).setRentalPricePerBlock(frameTokenId, parseEther("0.000000000000000010"));
+		const rentalPricePerBlock = await Frame.getRentalPricePerBlock(frameTokenId);
+		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000010"));
+    });
+
+	it("should mint a Frame and set the rentalPricePerBlock on it, then have someone fail to become the Renter without not enough paid for 10 blocks", async function () {
+		const frameTokenId = await mintAndFulfil(Category.K, minter1);
+		await Frame.connect(minter1).setRentalPricePerBlock(frameTokenId, parseEther("0.000000000000000010"));
+		const rentalPricePerBlock = await Frame.getRentalPricePerBlock(frameTokenId);
+		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000010"));
+		const rentalCost : BigNumberish = parseEther("0.000000000000000010").mul(5);
+		const currentBlockNumber = await ethers.provider.getBlockNumber();
+		await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, currentBlockNumber+10,{value: rentalCost})).to.be.revertedWith("Frame: Rental payment");
+    });
+
+	it("should mint a Frame and set the rentalPricePerBlock on it, then have someone become the Renter successfully", async function () {
+		const frameTokenId = await mintAndFulfil(Category.K, minter1);
+		await Frame.connect(minter1).setRentalPricePerBlock(frameTokenId, parseEther("0.000000000000000010"));
+		const rentalPricePerBlock = await Frame.getRentalPricePerBlock(frameTokenId);
+		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000010"));
+		const rentalCost : BigNumberish = parseEther("0.000000000000000010").mul(10);
+		const currentBlockNumber = await ethers.provider.getBlockNumber();
+		await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, currentBlockNumber+10,{value: rentalCost})).to.emit(Frame, "RenterSet").withArgs(frameTokenId, minter2.address, currentBlockNumber+10);
+    });
+
+	it("should mint a Frame and set the rentalPricePerBlock on it, then have someone become the Renter successfully after overpaying", async function () {
+		const frameTokenId = await mintAndFulfil(Category.K, minter1);
+		await Frame.connect(minter1).setRentalPricePerBlock(frameTokenId, parseEther("0.000000000000000010"));
+		const rentalPricePerBlock = await Frame.getRentalPricePerBlock(frameTokenId);
+		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000010"));
+		const rentalCost : BigNumberish = parseEther("0.000000000000000010").mul(100);
+		const currentBlockNumber = await ethers.provider.getBlockNumber();
+		await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, currentBlockNumber+10,{value: rentalCost})).to.emit(Frame, "RenterSet").withArgs(frameTokenId, minter2.address, currentBlockNumber+10);
     });
 
 });

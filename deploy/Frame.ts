@@ -82,6 +82,13 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 			vrfCoordinatorKeyHash =
 				"0x0000000000000000000000000000000000000000000000000000000000000001";
 			vrfCoordinatorFee = "2.0";
+
+			// If no real network specified, create a mock NFT for usage in test
+			const result3 = await deploy("ERC721Mock", {
+				from: deployer,
+				args: ["NFT", "NFT", "ipfs://"],
+				log: true,
+			});
 		}
 	}
 
