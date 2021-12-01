@@ -26,7 +26,11 @@ interface IExhibitionable {
         uint256 _exhibitTokenId
     ) external;
 
-    function exhibitIsOwnedBy(address _exhibitor, address _exhibitContractAddress, uint256 _exhibitTokenId) external view returns (bool);
+    function exhibitIsOwnedBy(
+        address _exhibitor,
+        address _exhibitContractAddress,
+        uint256 _exhibitTokenId
+    ) external view returns (bool);
 
     function clearExhibit(uint256 _tokenId) external;
 

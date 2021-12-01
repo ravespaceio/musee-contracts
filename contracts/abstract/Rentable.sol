@@ -21,7 +21,8 @@ abstract contract Rentable is IRentable {
     function _setRenter(
         uint256 _tokenId,
         address _renter,
-        uint256 _rentalExpiryAtBlock) internal {
+        uint256 _rentalExpiryAtBlock
+    ) internal {
         Rental storage rental = _renters[_tokenId];
         rental.renter = _renter;
         rental.rentalExpiryBlock = _rentalExpiryAtBlock;
@@ -41,7 +42,7 @@ abstract contract Rentable is IRentable {
     }
 
     function _setRentalPricePerBlock(uint256 _tokenId, uint256 _rentalPrice) internal {
-         _rentalPrices[_tokenId] = _rentalPrice;
+        _rentalPrices[_tokenId] = _rentalPrice;
     }
 
     function getRentalPricePerBlock(uint256 _tokenId) external view override returns (uint256) {

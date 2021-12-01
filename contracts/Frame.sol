@@ -148,7 +148,14 @@ contract Frame is
         address _exhibitContractAddress,
         uint256 _exhibitTokenId
     ) {
-        require(Exhibitionable(this).exhibitIsOwnedBy(_exhibitor, _exhibitContractAddress, _exhibitTokenId), "Frame: Exhibit not owned");
+        require(
+            Exhibitionable(this).exhibitIsOwnedBy(
+                _exhibitor,
+                _exhibitContractAddress,
+                _exhibitTokenId
+            ),
+            "Frame: Exhibit not owned"
+        );
         _;
     }
 
@@ -257,7 +264,11 @@ contract Frame is
         _setRentalPricePerBlock(_tokenId, _rentalPrice);
     }
 
-    function _verifyOwnership(address _ownerOrRenter, uint256 _tokenId) internal view returns (bool) {
+    function _verifyOwnership(address _ownerOrRenter, uint256 _tokenId)
+        internal
+        view
+        returns (bool)
+    {
         if (_isCurrentlyRented(_tokenId)) {
             require(_tokenIsRented(_tokenId, _ownerOrRenter), "Frame: Not the Renter");
         } else {
