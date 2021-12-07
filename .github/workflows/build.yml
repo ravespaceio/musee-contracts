@@ -34,26 +34,26 @@ jobs:
           git config user.name "GitHub Actions Bot"
           git config user.email "<>"
 
-      - name: Deploy Goerli
-        if: github.ref == 'refs/heads/goerli'
-        run: |
-          yarn deploy:goerli
-          git commit -am "GitHub Actions - Check in new artifacts"
-          git push origin goerli
+      # - name: Deploy Goerli
+      #   if: github.ref == 'refs/heads/goerli'
+      #   run: |
+      #     yarn deploy:goerli
+      #     git commit -am "GitHub Actions - Check in new artifacts"
+      #     git push origin goerli
       
-      - name: Deploy Ropsten
-        if: github.ref == 'refs/heads/ropsten'
-        run: |
-          yarn deploy:ropsten
-          git commit -am "GitHub Actions - Check in new artifacts"
-          git push origin ropsten
+      # - name: Deploy Ropsten
+      #   if: github.ref == 'refs/heads/ropsten'
+      #   run: |
+      #     yarn deploy:ropsten
+      #     git commit -am "GitHub Actions - Check in new artifacts"
+      #     git push origin ropsten
       
-      - name: Deploy Mainnet
-        if: github.ref == 'refs/heads/main'
-        run: |
-          yarn deploy:mainnet
-          git commit -am "GitHub Actions - Check in new artifacts"
-          git push origin main
+      # - name: Deploy Mainnet
+      #   if: github.ref == 'refs/heads/main'
+      #   run: |
+      #     yarn deploy:mainnet
+      #     git commit -am "GitHub Actions - Check in new artifacts"
+      #     git push origin main
 
       - name: Run Check Git
         run: |
