@@ -26,8 +26,8 @@ jobs:
           yarn build
           yarn docgen
       
-      - name: Run Coverage
-        run: yarn coverage
+      - name: Run Test
+        run: yarn test
 
       - name: Setup Git Config
         run: |
@@ -47,6 +47,13 @@ jobs:
       #     yarn deploy:ropsten
       #     git commit -am "GitHub Actions - Check in new artifacts"
       #     git push origin ropsten
+
+      # - name: Deploy Rinkeby
+      #   if: github.ref == 'refs/heads/rinkeby'
+      #   run: |
+      #     yarn deploy:rinkeby
+      #     git commit -am "GitHub Actions - Check in new artifacts"
+      #     git push origin rinkeby
       
       # - name: Deploy Mainnet
       #   if: github.ref == 'refs/heads/main'
