@@ -21,7 +21,11 @@ let minter2: SignerWithAddress;
 let minter3: SignerWithAddress;
 let Frame: ethersTypes.Contract;
 let VRFCoordinator: ethersTypes.Contract;
-let ExhibitMock: ethersTypes.Contract;
+let ExhibitERC721Mock: ethersTypes.Contract;
+let ExhibitERC1155Mock: ethersTypes.Contract;
+let NonCompliantContract: ethersTypes.Contract;
+
+const zeroBytes = "0x0000000000000000000000000000000000000000000000000000000000000000";
 
 const deploy = deployments.createFixture(async () => {
 	
@@ -43,10 +47,19 @@ const deploy = deployments.createFixture(async () => {
 		(await deployments.get("VRFCoordinatorMock")).address
 	);
 
-	ExhibitMock = await ethers.getContractAt(
+	ExhibitERC721Mock = await ethers.getContractAt(
 		"ERC721Mock",
 		(await deployments.get("ERC721Mock")).address
 	);
+	ExhibitERC1155Mock = await ethers.getContractAt(
+		"ERC1155Mock",
+		(await deployments.get("ERC1155Mock")).address
+	);
+	NonCompliantContract = await ethers.getContractAt(
+		"NonCompliantContract",
+		(await deployments.get("NonCompliantContract")).address
+	);
+
 });
 
 function getRandomInt(min:number, max:number) : number {
@@ -169,30 +182,77 @@ describe("Frame Exhibiting", () => {
 
 	beforeEach(async () => {
 		await deploy();
-	});
-	
+	});	
+
+	// ERC721
 	it("should set and Exhibit on an owned Frame for another owned ERC-721 compatible NFT", async function () {
-		await ExhibitMock.connect(owner).mint(minter1.address);
+		await ExhibitERC721Mock.connect(owner).mint(minter1.address);
 		const exhibitTokenId = 0;
 		const frameTokenId = await mintAndFulfil(Category.K, minter1);
-		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitMock.address, exhibitTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, ExhibitMock.address, exhibitTokenId);
+		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitERC721Mock.address, exhibitTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, ExhibitERC721Mock.address, exhibitTokenId);
+    });
+
+	it("should set and Exhibit on an owned Frame for another owned ERC-721 compatible NFT and retrieve the tokenUri", async function () {
+		await ExhibitERC721Mock.connect(owner).mint(minter1.address);
+		const exhibitTokenId = 0;
+		const frameTokenId = await mintAndFulfil(Category.K, minter1);
+		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitERC721Mock.address, exhibitTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, ExhibitERC721Mock.address, exhibitTokenId);
+		const tokenUri = await Frame.getExhibitTokenURI(frameTokenId);
+		expect(tokenUri).to.equal(`ipfs://ERC721Mock/${exhibitTokenId}`);
     });
 	
 	it("should set and Exhibit on an owned Frame for another owned ERC-721 compatible NFT and then clear it", async function () {
-		await ExhibitMock.connect(owner).mint(minter1.address);
+		await ExhibitERC721Mock.connect(owner).mint(minter1.address);
 		const exhibitTokenId = 0;
 		const frameTokenId = await mintAndFulfil(Category.K, minter1);
-		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitMock.address, exhibitTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, ExhibitMock.address, exhibitTokenId);
+		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitERC721Mock.address, exhibitTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, ExhibitERC721Mock.address, exhibitTokenId);
 		await expect(Frame.connect(minter1).clearExhibit(frameTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, "0x0000000000000000000000000000000000000000", 0);
     });
 
 	it("should fail to set Exhibit on an owned Frame for an ERC-721 compatible NFT not owned by the Frame owner", async function () {
-		await ExhibitMock.connect(owner).mint(minter2.address);
+		await ExhibitERC721Mock.connect(owner).mint(minter2.address);
 		const exhibitTokenId = 0;
 		const frameTokenId = await mintAndFulfil(Category.K, minter1);
-		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitMock.address, exhibitTokenId)).to.be.revertedWith("Frame: Exhibit not owned");
+		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitERC721Mock.address, exhibitTokenId)).to.be.revertedWith("Frame: Exhibit not valid");
     });
 
+	// ERC-1155
+	it("should set and Exhibit on an owned Frame for another owned ERC-1155 compatible NFT", async function () {
+		await ExhibitERC1155Mock.connect(owner).mint(minter1.address, 0, 1, zeroBytes);
+		const exhibitTokenId = 0;
+		const frameTokenId = await mintAndFulfil(Category.K, minter1);
+		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitERC1155Mock.address, exhibitTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, ExhibitERC1155Mock.address, exhibitTokenId);
+    });
+
+	it("should set and Exhibit on an owned Frame for another owned ERC-1155 compatible NFT and retrieve the tokenUri", async function () {
+		await ExhibitERC1155Mock.connect(owner).mint(minter1.address, 0, 1, zeroBytes);
+		const exhibitTokenId = 0;
+		const frameTokenId = await mintAndFulfil(Category.K, minter1);
+		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitERC1155Mock.address, exhibitTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, ExhibitERC1155Mock.address, exhibitTokenId);
+		const tokenUri = await Frame.getExhibitTokenURI(frameTokenId);
+		expect(tokenUri).to.equal("ipfs://ERC1155Mock/{id}");
+    });
+	
+	it("should set and Exhibit on an owned Frame for another owned ERC-1155 compatible NFT and then clear it", async function () {
+		await ExhibitERC1155Mock.connect(owner).mint(minter1.address, 0, 1, zeroBytes);
+		const exhibitTokenId = 0;
+		const frameTokenId = await mintAndFulfil(Category.K, minter1);
+		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitERC1155Mock.address, exhibitTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, ExhibitERC1155Mock.address, exhibitTokenId);
+		await expect(Frame.connect(minter1).clearExhibit(frameTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, "0x0000000000000000000000000000000000000000", 0);
+    });
+
+	it("should fail to set Exhibit on an owned Frame for an ERC-1155 compatible NFT not owned by the Frame owner", async function () {
+		await ExhibitERC1155Mock.connect(owner).mint(minter2.address, 0, 1, zeroBytes);
+		const exhibitTokenId = 0;
+		const frameTokenId = await mintAndFulfil(Category.K, minter1);
+		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitERC1155Mock.address, exhibitTokenId)).to.be.revertedWith("Frame: Exhibit not valid");
+    });
+
+	// Non compliant contract
+	it("should fail to set Exhibit on an owned random contract which doesn't implement the ERC-165 standards for ERC-721, ERC-1155 (even if it implments portions of either interface)", async function () {
+		const frameTokenId = await mintAndFulfil(Category.K, minter1);
+		await expect(Frame.connect(minter1).setExhibit(frameTokenId, NonCompliantContract.address, 0)).to.be.revertedWith("Transaction reverted: function selector was not recognized and there's no fallback function");
+    });
 });
 
 describe("Frame Renting", () => {

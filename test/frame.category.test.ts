@@ -95,6 +95,20 @@ describe("Frame Administration", () => {
 		).to.be.revertedWith(
 			"Transaction reverted: function was called with incorrect parameters"
 		);
-    });       
+    });
+	
+	it("should return getCategoryDetail for a valid category A (0)", async function () {
+		const [a,b,c,d] = await Frame.getCategoryDetail(0);
+		expect(a).to.equal(parseEther("100.0"));
+		expect(b).to.equal(0);
+		expect(c).to.equal(1);
+		expect(d).to.equal(0);
+    });
+	
+	it("should fail to return getCategoryDetail for an invalid category Z (25)", async function () {
+		await expect(Frame.getCategoryDetail(25)).to.be.revertedWith(
+			"Transaction reverted: function was called with incorrect parameters"
+		);
+    });  
 
 });

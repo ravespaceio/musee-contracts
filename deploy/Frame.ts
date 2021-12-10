@@ -64,8 +64,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 			break;
 		}
 		default: {
-			// If no real network specified, create our own LINK Token, 
-			// VRFCoordinator, and some mock Exhibit contracts 
+			// If no real network specified, create our own LINK Token,
+			// VRFCoordinator, and some mock Exhibit contracts
 
 			const result1 = await deploy("LinkMock", {
 				from: deployer,
@@ -94,8 +94,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 				from: deployer,
 				args: ["ipfs://ERC1155Mock/{id}"],
 				log: true,
-			});	
-			
+			});
+
 			await deploy("NonCompliantContract", {
 				from: deployer,
 				args: [],
