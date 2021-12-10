@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
-import "@openzeppelin/contracts/token/ERC1155/extensions/IERC1155MetadataURI.sol"; 
+import "@openzeppelin/contracts/token/ERC1155/extensions/IERC1155MetadataURI.sol";
 import "hardhat/console.sol";
 
 abstract contract Exhibitionable is IExhibitionable {
@@ -36,11 +36,10 @@ abstract contract Exhibitionable is IExhibitionable {
         address _exhibitContractAddress,
         uint256 _exhibitTokenId
     ) external view virtual override returns (bool) {
-        
         if (_implementsERC721(_exhibitContractAddress))
             return _erc721ExhibitIsOwnedBy(_exhibitor, _exhibitContractAddress, _exhibitTokenId);
 
-        if (_implementsERC1155(_exhibitContractAddress))    
+        if (_implementsERC1155(_exhibitContractAddress))
             return _erc1155ExhibitIsOwnedBy(_exhibitor, _exhibitContractAddress, _exhibitTokenId);
 
         return false;
@@ -71,34 +70,31 @@ abstract contract Exhibitionable is IExhibitionable {
     }
 
     function getExhibitTokenURI(uint256 _tokenId) external view override returns (string memory) {
-        
         Exhibit storage _exhibit = _exhibits[_tokenId];
         string memory tokenUri;
 
-        if(_implementsERC721(_exhibit.contractAddress)) {
-            
+        if (_implementsERC721(_exhibit.contractAddress)) {
             /**
-            * @dev See {IERC721Metadata-tokenURI}.
-            * @dev Returns the Uniform Resource Identifier (URI) for `tokenId` token.
-            */        
+             * @dev See {IERC721Metadata-tokenURI}.
+             * @dev Returns the Uniform Resource Identifier (URI) for `tokenId` token.
+             */
             tokenUri = IERC721Metadata(_exhibit.contractAddress).tokenURI(_exhibit.tokenId);
         }
 
-        if(_implementsERC1155(_exhibit.contractAddress)) {
-            
+        if (_implementsERC1155(_exhibit.contractAddress)) {
             /**
-            * @dev See {IERC1155MetadataURI-uri}.
-            *
-            * This implementation returns the same URI for *all* token types. It relies
-            * on the token type ID substitution mechanism
-            * https://eips.ethereum.org/EIPS/eip-1155#metadata[defined in the EIP].
-            *
-            * Clients calling this function must replace the `\{id\}` substring with the
-            * actual token type ID.
-            */
+             * @dev See {IERC1155MetadataURI-uri}.
+             *
+             * This implementation returns the same URI for *all* token types. It relies
+             * on the token type ID substitution mechanism
+             * https://eips.ethereum.org/EIPS/eip-1155#metadata[defined in the EIP].
+             *
+             * Clients calling this function must replace the `\{id\}` substring with the
+             * actual token type ID.
+             */
             tokenUri = IERC1155MetadataURI(_exhibit.contractAddress).uri(_exhibit.tokenId);
         }
-        return tokenUri;        
+        return tokenUri;
     }
 
     function getExhibit(uint256 _tokenId) external view virtual override returns (Exhibit memory) {

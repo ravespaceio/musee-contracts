@@ -192,7 +192,16 @@ contract Frame is
      * @return uint256 The total supply of the Category
      * @return uint256 The remaining supply of the Category
      */
-    function getCategoryDetail(Category _category) public view returns (uint256,uint256,uint256,uint256){
+    function getCategoryDetail(Category _category)
+        public
+        view
+        returns (
+            uint256,
+            uint256,
+            uint256,
+            uint256
+        )
+    {
         CategoryDetail storage category = categories[_category];
         uint256 supplyRemaining = category.supply - category.tokenIds.length();
         return (category.price, category.startingTokenId, category.supply, supplyRemaining);

@@ -35,4 +35,6 @@ interface IExhibitionable {
     function clearExhibit(uint256 _tokenId) external;
 
     function getExhibit(uint256 _tokenId) external view returns (Exhibit memory);
+
+    function getExhibitTokenURI(uint256 _tokenId) external view returns (string memory);
 }
