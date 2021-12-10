@@ -154,7 +154,7 @@ contract Frame is
                 _exhibitContractAddress,
                 _exhibitTokenId
             ),
-            "Frame: Exhibit not owned"
+            "Frame: Exhibit not valid"
         );
         _;
     }
@@ -182,6 +182,20 @@ contract Frame is
      */
     function _tokenIsOwned(uint256 _tokenId, address _address) internal view returns (bool) {
         return _address == ownerOf(_tokenId);
+    }
+
+    /**
+     * @notice Returns information about a Category
+     * @param _category The Category to retrieve
+     * @return uint256 The price of the Category in wei
+     * @return uint256 The startingTokenId of the Category
+     * @return uint256 The total supply of the Category
+     * @return uint256 The remaining supply of the Category
+     */
+    function getCategoryDetail(Category _category) public view returns (uint256,uint256,uint256,uint256){
+        CategoryDetail storage category = categories[_category];
+        uint256 supplyRemaining = category.supply - category.tokenIds.length();
+        return (category.price, category.startingTokenId, category.supply, supplyRemaining);
     }
 
     /**
@@ -270,9 +284,13 @@ contract Frame is
         returns (bool)
     {
         if (_isCurrentlyRented(_tokenId)) {
-            require(_tokenIsRented(_tokenId, _ownerOrRenter), "Frame: Not the Renter");
+            bool rented = _tokenIsRented(_tokenId, _ownerOrRenter);
+            require(rented, "Frame: Not the Renter");
+            return rented;
         } else {
-            require(_tokenIsOwned(_tokenId, _ownerOrRenter), "Frame: Not the Owner");
+            bool owned = _tokenIsOwned(_tokenId, _ownerOrRenter);
+            require(owned, "Frame: Not the Owner");
+            return owned;
         }
     }
 

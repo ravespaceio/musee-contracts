@@ -64,7 +64,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 			break;
 		}
 		default: {
-			// If no real network specified, create our own LINK Token
+			// If no real network specified, create our own LINK Token, 
+			// VRFCoordinator, and some mock Exhibit contracts 
+
 			const result1 = await deploy("LinkMock", {
 				from: deployer,
 				args: ["LINK", "LINK"],
@@ -72,7 +74,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 			});
 			linkAddress = result1.address;
 
-			// If no real network specified, create our own VRFCoordinator
 			const result2 = await deploy("VRFCoordinatorMock", {
 				from: deployer,
 				args: [],
@@ -83,10 +84,21 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 				"0x0000000000000000000000000000000000000000000000000000000000000001";
 			vrfCoordinatorFee = "2.0";
 
-			// If no real network specified, create a mock NFT for usage in test
-			const result3 = await deploy("ERC721Mock", {
+			await deploy("ERC721Mock", {
 				from: deployer,
-				args: ["NFT", "NFT", "ipfs://"],
+				args: ["NFT", "NFT", "ipfs://ERC721Mock/"],
+				log: true,
+			});
+
+			await deploy("ERC1155Mock", {
+				from: deployer,
+				args: ["ipfs://ERC1155Mock/{id}"],
+				log: true,
+			});	
+			
+			await deploy("NonCompliantContract", {
+				from: deployer,
+				args: [],
 				log: true,
 			});
 		}

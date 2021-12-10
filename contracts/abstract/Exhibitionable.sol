@@ -4,7 +4,9 @@ pragma solidity ^0.8.4;
 import "../interface/IExhibitionable.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+import "@openzeppelin/contracts/token/ERC1155/extensions/IERC1155MetadataURI.sol"; 
 import "hardhat/console.sol";
 
 abstract contract Exhibitionable is IExhibitionable {
@@ -34,16 +36,22 @@ abstract contract Exhibitionable is IExhibitionable {
         address _exhibitContractAddress,
         uint256 _exhibitTokenId
     ) external view virtual override returns (bool) {
-        if (IERC165(_exhibitContractAddress).supportsInterface(type(IERC721).interfaceId)) {
-            // console.log("Exhibit supports ERC721 interface");
+        
+        if (_implementsERC721(_exhibitContractAddress))
             return _erc721ExhibitIsOwnedBy(_exhibitor, _exhibitContractAddress, _exhibitTokenId);
-        } else if (IERC165(_exhibitContractAddress).supportsInterface(type(IERC1155).interfaceId)) {
-            // console.log("Exhibit supports ERC1155 interface");
+
+        if (_implementsERC1155(_exhibitContractAddress))    
             return _erc1155ExhibitIsOwnedBy(_exhibitor, _exhibitContractAddress, _exhibitTokenId);
-        } else {
-            console.log("Exhibit supports neither ERC721 or ERC1155 interface");
-        }
+
         return false;
+    }
+
+    function _implementsERC721(address _contractAddress) internal view returns (bool) {
+        return IERC165(_contractAddress).supportsInterface(type(IERC721).interfaceId);
+    }
+
+    function _implementsERC1155(address _contractAddress) internal view returns (bool) {
+        return IERC165(_contractAddress).supportsInterface(type(IERC1155).interfaceId);
     }
 
     function _erc721ExhibitIsOwnedBy(
@@ -51,9 +59,6 @@ abstract contract Exhibitionable is IExhibitionable {
         address _exhibitContractAddress,
         uint256 _exhibitTokenId
     ) internal view returns (bool) {
-        address owner = IERC721(_exhibitContractAddress).ownerOf(_exhibitTokenId);
-        // console.log("Owner of Exhibit is ", owner);
-        // console.log("Exhibitor is ", _exhibitor);
         return IERC721(_exhibitContractAddress).ownerOf(_exhibitTokenId) == _exhibitor;
     }
 
@@ -63,6 +68,37 @@ abstract contract Exhibitionable is IExhibitionable {
         uint256 _exhibitTokenId
     ) internal view returns (bool) {
         return IERC1155(_exhibitContractAddress).balanceOf(_exhibitor, _exhibitTokenId) > 0;
+    }
+
+    function getExhibitTokenURI(uint256 _tokenId) external view override returns (string memory) {
+        
+        Exhibit storage _exhibit = _exhibits[_tokenId];
+        string memory tokenUri;
+
+        if(_implementsERC721(_exhibit.contractAddress)) {
+            
+            /**
+            * @dev See {IERC721Metadata-tokenURI}.
+            * @dev Returns the Uniform Resource Identifier (URI) for `tokenId` token.
+            */        
+            tokenUri = IERC721Metadata(_exhibit.contractAddress).tokenURI(_exhibit.tokenId);
+        }
+
+        if(_implementsERC1155(_exhibit.contractAddress)) {
+            
+            /**
+            * @dev See {IERC1155MetadataURI-uri}.
+            *
+            * This implementation returns the same URI for *all* token types. It relies
+            * on the token type ID substitution mechanism
+            * https://eips.ethereum.org/EIPS/eip-1155#metadata[defined in the EIP].
+            *
+            * Clients calling this function must replace the `\{id\}` substring with the
+            * actual token type ID.
+            */
+            tokenUri = IERC1155MetadataURI(_exhibit.contractAddress).uri(_exhibit.tokenId);
+        }
+        return tokenUri;        
     }
 
     function getExhibit(uint256 _tokenId) external view virtual override returns (Exhibit memory) {
