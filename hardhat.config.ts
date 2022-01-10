@@ -4,6 +4,7 @@ import "hardhat-docgen";
 import "@nomiclabs/hardhat-waffle";
 import "hardhat-deploy";
 import "@nomiclabs/hardhat-ethers";
+import "hardhat-gas-reporter"
 
 task("accounts", "Prints the list of accounts", async (args, hre) => {
   const accounts = await hre.ethers.getSigners();
@@ -14,6 +15,11 @@ task("accounts", "Prints the list of accounts", async (args, hre) => {
 });
 
 const ETH_DERIVATION_PATH = "m/44'/52752'/0'/0/";
+
+function getCoinMarketCapAPIKey(network:string): string {
+	require("dotenv").config({ path: `.env.${network}` });
+	return process.env.COINMARKETCAP_API || '';  
+}
 
 function getMnemonic(network:string) : string {
 	require("dotenv").config({ path: `.env.${network}` });
@@ -94,5 +100,9 @@ export default {
     path: './docs',
     clear: true,
     runOnCompile: true,
+  },
+  gasReporter: {
+    currency: 'EUR',
+    coinmarketcap: getCoinMarketCapAPIKey("rinkeby")
   }
 };
