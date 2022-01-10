@@ -12,14 +12,14 @@ interface IRentable {
      *
      * @param _tokenId   Token identifier which is setting a renter
      * @param _renter    The new renter address
-     * @param _rentalExpiryBlock The block that the rental expires
+     * @param _rentalExpiryBlock The blocks to rent for
      */
     event RenterSet(uint256 indexed _tokenId, address indexed _renter, uint256 _rentalExpiryBlock);
 
     function setRenter(
         uint256 _tokenId,
         address _renter,
-        uint256 _rentalExpiryAtBlock
+        uint256 _numberOfBlocks
     ) external payable;
 
     function getRenter(uint256 _tokenId) external view returns (Rental memory);

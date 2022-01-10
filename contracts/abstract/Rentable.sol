@@ -13,19 +13,19 @@ abstract contract Rentable is IRentable {
     function setRenter(
         uint256 _tokenId,
         address _renter,
-        uint256 _rentalExpiryAtBlock
+        uint256 _numberOfBlocks
     ) external payable virtual override {
-        _setRenter(_tokenId, _renter, _rentalExpiryAtBlock);
+        _setRenter(_tokenId, _renter, _numberOfBlocks);
     }
 
     function _setRenter(
         uint256 _tokenId,
         address _renter,
-        uint256 _rentalExpiryAtBlock
+        uint256 _numberOfBlocks
     ) internal {
         Rental storage rental = _renters[_tokenId];
         rental.renter = _renter;
-        rental.rentalExpiryBlock = _rentalExpiryAtBlock;
+        rental.rentalExpiryBlock = block.number + _numberOfBlocks;
         emit RenterSet(_tokenId, rental.renter, rental.rentalExpiryBlock);
     }
 

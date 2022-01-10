@@ -46,7 +46,7 @@ describe("Frame Administration", () => {
         expect(result[0]).to.equal(1);
         expect(result[1]).to.equal(0);
         expect(result[2]).to.equal(2);
-        expect(result[3]).to.equal(0);
+        expect(result[3]).to.equal(1);
     });
 
 	it("should not be able to setCategoriesInitialized as non-Owner", async function () {

@@ -276,8 +276,16 @@ describe("Frame Renting", () => {
 		const rentalPricePerBlock = await Frame.getRentalPricePerBlock(frameTokenId);
 		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000010"));
 		const rentalCost : BigNumberish = parseEther("0.000000000000000010").mul(5);
-		const currentBlockNumber = await ethers.provider.getBlockNumber();
-		await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, currentBlockNumber+10,{value: rentalCost})).to.be.revertedWith("Frame: Rental payment");
+		await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, 10,{value: rentalCost})).to.be.revertedWith("Frame: Incorrect payment");
+    });
+
+	it("should mint a Frame and set the rentalPricePerBlock on it, then have someone fail to become the Renter paying too much for 10 blocks", async function () {
+		const frameTokenId = await mintAndFulfil(Category.K, minter1);
+		await Frame.connect(minter1).setRentalPricePerBlock(frameTokenId, parseEther("0.000000000000000010"));
+		const rentalPricePerBlock = await Frame.getRentalPricePerBlock(frameTokenId);
+		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000010"));
+		const rentalCost : BigNumberish = parseEther("0.000000000000000010").mul(20);
+		await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, 10,{value: rentalCost})).to.be.revertedWith("Frame: Incorrect payment");
     });
 
 	it("should mint a Frame and set the rentalPricePerBlock on it, then have someone become the Renter successfully", async function () {
@@ -287,17 +295,18 @@ describe("Frame Renting", () => {
 		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000010"));
 		const rentalCost : BigNumberish = parseEther("0.000000000000000010").mul(10);
 		const currentBlockNumber = await ethers.provider.getBlockNumber();
-		await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, currentBlockNumber+10,{value: rentalCost})).to.emit(Frame, "RenterSet").withArgs(frameTokenId, minter2.address, currentBlockNumber+10);
+		await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, 10,{value: rentalCost})).to.emit(Frame, "RenterSet").withArgs(frameTokenId, minter2.address, currentBlockNumber+10+1);
     });
 
-	it("should mint a Frame and set the rentalPricePerBlock on it, then have someone become the Renter successfully after overpaying", async function () {
+	it("should mint a Frame and set the rentalPricePerBlock on it, then have someone become the Renter successfully\nthen have someone fail to rent again while it's still rented", async function () {
 		const frameTokenId = await mintAndFulfil(Category.K, minter1);
 		await Frame.connect(minter1).setRentalPricePerBlock(frameTokenId, parseEther("0.000000000000000010"));
 		const rentalPricePerBlock = await Frame.getRentalPricePerBlock(frameTokenId);
 		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000010"));
-		const rentalCost : BigNumberish = parseEther("0.000000000000000010").mul(100);
+		const rentalCost : BigNumberish = parseEther("0.000000000000000010").mul(10);
 		const currentBlockNumber = await ethers.provider.getBlockNumber();
-		await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, currentBlockNumber+10,{value: rentalCost})).to.emit(Frame, "RenterSet").withArgs(frameTokenId, minter2.address, currentBlockNumber+10);
+		await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, 10,{value: rentalCost})).to.emit(Frame, "RenterSet").withArgs(frameTokenId, minter2.address, currentBlockNumber+10+1);
+		await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, 10,{value: rentalCost})).to.be.revertedWith("Frame: Token already rented");
     });
 
 });

@@ -72,7 +72,7 @@ contract Frame is
             uint256
         )
     {
-        return (1, 0, 2, 0);
+        return (1, 0, 2, 1);
     }
 
     /**
@@ -97,14 +97,6 @@ contract Frame is
      */
     modifier tokenExists(uint256 _tokenId) {
         require(_exists(_tokenId), "ERC721: operator query for nonexistent token");
-        _;
-    }
-
-    /**
-     * @notice Enforces a block value is in the future
-     */
-    modifier blockInFuture(uint256 _block) {
-        require(_block > block.number, "Frame: Block not in future");
         _;
     }
 
@@ -231,8 +223,7 @@ contract Frame is
      */
     function _isCurrentlyRented(uint256 _tokenId) internal view returns (bool) {
         Rental memory tokenRental = Rentable(this).getRenter(_tokenId);
-        return
-            (tokenRental.rentalExpiryBlock != 0) || (tokenRental.rentalExpiryBlock > block.number);
+        return tokenRental.rentalExpiryBlock > block.number;
     }
 
     /**
@@ -242,35 +233,27 @@ contract Frame is
     function setRenter(
         uint256 _tokenId,
         address _renter,
-        uint256 _rentalExpiryAtBlock
+        uint256 _numberOfBlocks
     )
         external
         payable
         override
         tokenExists(_tokenId)
         tokenNotRented(_tokenId)
-        blockInFuture(_rentalExpiryAtBlock)
         rentalPriceSet(_tokenId)
         nonReentrant
     {
         // Calculate rent
         uint256 rentalCostPerBlock = Rentable(this).getRentalPricePerBlock(_tokenId);
-        uint256 rentalCost = (_rentalExpiryAtBlock - block.number) * rentalCostPerBlock;
-        require(msg.value >= rentalCost, "Frame: Rental payment");
+        uint256 rentalCost = _numberOfBlocks * rentalCostPerBlock;
+        require(msg.value == rentalCost, "Frame: Incorrect payment");
 
         // Send to owner
         address payable tokenOwner = payable(ownerOf(_tokenId));
         _transfer(tokenOwner, rentalCost);
 
-        // Send change to renter (if any)
-        uint256 change = msg.value - rentalCost;
-        address payable renter = payable(_msgSender());
-        if (change > 0) {
-            _transfer(renter, change);
-        }
-
         // Rent
-        _setRenter(_tokenId, _renter, _rentalExpiryAtBlock);
+        _setRenter(_tokenId, _renter, _numberOfBlocks);
     }
 
     function _transfer(address payable _to, uint256 _amount) internal {
