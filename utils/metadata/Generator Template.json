@@ -1,0 +1,139 @@
+{
+   "name":"Frame #204",
+   "description":"Musee Dezental Frame #204",
+   "background_color":"EEEEEE",
+   "external_url":"https://musee-dezental.com/frames/204",
+   "image":"QmQu7wyHC8RYWeJcWcWLUSg1aCTiVRirYSkXJw1PAqMQWX",
+   "attributes":[
+      {
+         "trait_type":"Category",
+         "value":"K"
+      },
+      {
+        "trait_type":"Type",
+        "value":"Fluid"
+     },
+     {
+        "trait_type":"Chameleon",
+        "value":"Yes"
+     },
+      {
+         "trait_type":"Floor",
+         "value":"2"
+      },
+      {
+         "trait_type":"TokenID",
+         "value":"204"
+      }
+   ]
+}
+
+
+let id = 0;
+let type
+let floor
+let category
+let chameleon
+
+if(id == 0){
+   type = "Procedual Marble"
+   category = "A"
+   floor = "0"
+}
+
+if(id == 1 || id == 2){
+   type = "Procedual Marble"
+   category = "B"
+   floor = "0"
+}
+
+if(id >= 3 && id <= 10){
+   type = "Procedual Marble"
+   category = "C"
+   floor = "0"
+}
+
+if(id >= 11 && id <= 22){
+   type = "Fluid"
+   category = "D"
+   floor = "0"
+}
+
+if(id >= 23 && id <= 38){
+   type = "Fluid"
+   category = "E"
+   floor = "1"
+}
+
+if(id >= 39 && id <= 56){
+   type = "Fluid"
+   category = "F"
+   floor = "1"
+}
+
+if(id >= 57 && id <= 80){
+   type = "Stone"
+   category = "G"
+   floor = "1"
+}
+
+if(id >= 81 && id <= 112){
+   type = "Abstract"
+   category = "H"
+   floor = "1"
+}
+
+if(id >= 113 && id <= 144){
+   type = "Wood"
+   category = "I"
+   floor = "2"
+}
+
+if(id >= 145 && id <= 180){
+   type = "Glitch"
+   category = "J"
+   floor = "2"
+}
+
+if(id >= 181 && id <= 221){
+   type = "Acid"
+   category = "K"
+   floor = "2"
+}
+
+
+// Chameleon
+if(id == 6){chameleon = true}
+
+if(id == 15){chameleon = true}
+
+if(id == 26){chameleon = true}
+if(id == 32){chameleon = true}
+
+if(id == 43){chameleon = true}
+if(id == 50){chameleon = true}
+
+if(id == 60){chameleon = true}
+if(id == 71){chameleon = true}
+
+if(id == 93){chameleon = true}
+if(id == 99){chameleon = true}
+if(id == 105){chameleon = true}
+
+if(id == 113){chameleon = true}
+if(id == 120){chameleon = true}
+if(id == 134){chameleon = true}
+if(id == 140){chameleon = true}
+
+if(id == 151){chameleon = true}
+if(id == 154){chameleon = true}
+if(id == 170){chameleon = true}
+if(id == 178){chameleon = true}
+
+if(id == 182){chameleon = true}
+if(id == 191){chameleon = true}
+if(id == 199){chameleon = true}
+if(id == 210){chameleon = true}
+if(id == 220){chameleon = true}
+
+https://drive.google.com/drive/folders/1dJtL9eHZ9c-fmegf4WzgodvwBj1uvqMd?usp=sharing
