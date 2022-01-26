@@ -36,19 +36,19 @@ let category
 let chameleon
 
 if(id == 0){
-   type = "Procedual Marble"
+   type = "Procedural Marble"
    category = "A"
    floor = "0"
 }
 
 if(id == 1 || id == 2){
-   type = "Procedual Marble"
+   type = "Procedural Marble"
    category = "B"
    floor = "0"
 }
 
 if(id >= 3 && id <= 10){
-   type = "Procedual Marble"
+   type = "Procedural Marble"
    category = "C"
    floor = "0"
 }
