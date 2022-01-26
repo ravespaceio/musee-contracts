@@ -103,6 +103,10 @@ if(id >= 181 && id <= 221){
 
 
 // Chameleon
+if(id == 0){chameleon = true}
+if(id == 1){chameleon = true}
+if(id == 2){chameleon = true}
+
 if(id == 6){chameleon = true}
 
 if(id == 15){chameleon = true}
