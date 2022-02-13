@@ -8,7 +8,19 @@ import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 import "@openzeppelin/contracts/token/ERC721/presets/ERC721PresetMinterPauserAutoId.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "./lib/ABDKMath64x64.sol";
 
+/**
+ * @title Musee Dezentral Frame NFT contract
+ *
+ * @dev   ERC-721 compatible token with multiple price categories
+ * @dev   Allows token holders to rent and exhibit other NFTs inside the Frame
+ * @dev   Uses Chainlink VRF function to select minting within a price category
+ * @dev   Implements a basic pre-sale list using AccessControl roles configured during deploy
+ * @dev   Implements ABDK math library for percentage-based fees arithmetic
+ *
+ * @author Aaron Boyd <https://github.com/aaronmboyd>
+ */
 contract Frame is
     IVersionedContract,
     ReentrancyGuard,
@@ -18,7 +30,12 @@ contract Frame is
     VRFConsumerBase
 {
     using EnumerableSet for EnumerableSet.UintSet;
-    string public contractURI;
+
+    enum SaleStatus {
+        OFF,
+        PRESALE,
+        MAINSALE
+    }
 
     enum Category {
         A,
@@ -39,23 +56,92 @@ contract Frame is
         uint256 supply;
         EnumerableSet.UintSet tokenIds;
     }
+
+    /**
+     * @dev Mappings
+     */
     mapping(Category => CategoryDetail) internal categories;
     mapping(bytes32 => address) public requestIdToSender;
     mapping(bytes32 => Category) public requestIdToCategory;
     mapping(bytes32 => uint256) public requestIdToTokenId;
 
+    /**
+     * @dev Chainlink variables
+     * @dev Fee: defaulted to 0.1 LINK on Rinkeby (varies by network), set during constructor
+     * @dev KeyHash: must be set during constructor (varies by network)
+     */
     bytes32 internal keyHash;
-    uint256 internal fee = 0.1 * 10**18; // 0.1 LINK (Varies by network)
-    bool internal categoriesInitialized = false;
+    uint256 internal fee = 0.1 * 10**18;
 
+    /**
+     * @dev Frame variables
+     * @dev Fee: defaulted to 0.1 LINK on Rinkeby (varies by network), set during constructor
+     * @dev KeyHash: must be set during constructor (varies by network)
+     */
+    bytes32 public constant PRESALE_ROLE = keccak256("PRESALE_ROLE");
+    SaleStatus internal saleStatus = SaleStatus.OFF;
+    int256 public rentalFeeNumerator = 50;
+    int256 public rentalFeeDenominator = 1000;
+
+    /**
+     * @dev ERC721 variables
+     */
+    string public contractURI;
+
+    /**
+     * @notice Triggered when a minting is requested
+     * @param _requestId      Request ID of the request
+     * @param _address        Recipient address
+     */
     event MintRequest(bytes32 indexed _requestId, address indexed _address);
+
+    /**
+     * @notice Triggered when a minting is fulfilled
+     * @param _requestId      Request ID of the fulfillment
+     * @param _address        Recipient address
+     * @param _tokenId        TokenID received
+     */
     event MintFulfilled(
         bytes32 indexed _requestId,
         address indexed _address,
         uint256 indexed _tokenId
     );
+
+    /**
+     * @notice Triggered when LINK is withdrawn
+     * @param _to             Recipient of the LINK
+     * @param _value          Withdrawal amount in wei
+     */
     event LinkWithdrawn(address indexed _to, uint256 _value);
+
+    /**
+     * @notice Triggered when ether is withdrawn
+     * @param _to             Recipient of the ether
+     * @param _value          Withdrawal amount in wei
+     */
     event EtherWithdrawn(address indexed _to, uint256 _value);
+
+    /**
+     * @notice Triggered when rental fee accumulated in the contract
+     * @param _tokenId        Token id that was rented
+     * @param _from           Frame owner
+     * @param _value          Rental fee collected
+     */
+    event RentalFeeCollectedFrom(uint256 indexed _tokenId, address indexed _from, uint256 _value);
+
+    /**
+     * @notice Triggered when the Rental Fee is updated
+     * @param _oldNumerator   Old numerator
+     * @param _oldDenominator Old denominator
+     * @param _newNumerator   New numerator
+     * @param _newDenominator New denominator
+     */
+    event RentalFeeUpdated(
+        int256 _oldNumerator,
+        int256 _oldDenominator,
+        int256 _newNumerator,
+        int256 _newDenominator
+    );
 
     /**
      * @notice Returns the storage, major, minor, and patch version of the contract.
@@ -76,10 +162,10 @@ contract Frame is
     }
 
     /**
-     *  @notice Enforces categories have been initialized
+     *  @notice Enforces any sale is on
      */
-    modifier categoriesReady() {
-        require(categoriesInitialized, "Frame: Not ready");
+    modifier mintingAvailable() {
+        require(saleStatus != SaleStatus.OFF, "Frame: Minting not available");
         _;
     }
 
@@ -109,26 +195,10 @@ contract Frame is
     }
 
     /**
-     * @notice Enforces an address should have the MINTER_ROLE
-     */
-    modifier onlyMinter(address _address) {
-        require(hasRole(MINTER_ROLE, _address), "Frame: Only minter");
-        _;
-    }
-
-    /**
      * @notice Enforces a tokenId should be owned by an address
      */
     modifier tokenIsOwned(uint256 _tokenId, address _address) {
         require(_tokenIsOwned(_tokenId, _address), "Frame: Not the Owner");
-        _;
-    }
-
-    /**
-     * @notice Enforces a tokenId should rented by an address
-     */
-    modifier tokenIsRented(uint256 _tokenId, address _address) {
-        require(_tokenIsRented(_tokenId, _address), "Frame: Not the Renter");
         _;
     }
 
@@ -168,7 +238,51 @@ contract Frame is
     }
 
     /**
-     * @notice Checks if a token is currently owned by
+     * @notice Constructor
+     * @dev Grants `DEFAULT_ADMIN_ROLE`, `MINTER_ROLE` and `PAUSER_ROLE` to the account that deploys the contract
+     */
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        string memory _baseTokenUri,
+        string memory _contractUri,
+        address _vrfCoordinator,
+        address _link,
+        bytes32 _keyHash,
+        uint256 _fee,
+        int256 _rentalFeeNumerator,
+        int256 _rentalFeeDenominator
+    )
+        ERC721PresetMinterPauserAutoId(_name, _symbol, _baseTokenUri)
+        VRFConsumerBase(_vrfCoordinator, _link)
+    {
+        // Used to generate a metadata location for the entire contract
+        // commonly used on secondary marketplaces like OpenSea to display collection information
+        contractURI = _contractUri;
+
+        // Used to requestRandomness from VRFConsumerBase
+        fee = _fee;
+        keyHash = _keyHash;
+
+        // Rental fee starting at 5%, adjustable
+        rentalFeeNumerator = _rentalFeeNumerator;
+        rentalFeeDenominator = _rentalFeeDenominator;
+    }
+
+    /**
+     * @dev Frame functions
+     */
+
+    /**
+     * @notice Internal: simple ether transfer
+     */
+    function _transfer(address payable _to, uint256 _amount) internal {
+        (bool success, ) = _to.call{value: _amount}("");
+        require(success, "Frame: Failed to send ETH");
+    }
+
+    /**
+     * @notice Internal: checks if a token is currently owned by address
      * @param _tokenId The token to check is owned
      * @param _address The address to check if it's owned by
      */
@@ -200,35 +314,11 @@ contract Frame is
     }
 
     /**
-     * @notice Checks if a token is currently rented by
-     * @param _tokenId The token to check is rented
-     * @param _address The address to check if it's rented by
-     */
-    function _tokenIsRented(uint256 _tokenId, address _address) internal view returns (bool) {
-        Rental memory tokenRental = Rentable(this).getRenter(_tokenId);
-        return tokenRental.renter == _address;
-    }
-
-    /**
-     * @notice Checks if a token is currently rented by anyone
-     * @param _tokenId The token to check is rented
-     */
-    function isCurrentlyRented(uint256 _tokenId) public view returns (bool) {
-        return _isCurrentlyRented(_tokenId);
-    }
-
-    /**
-     * @notice Checks if a token is currently rented
-     * @param _tokenId The token to check is rented
-     */
-    function _isCurrentlyRented(uint256 _tokenId) internal view returns (bool) {
-        Rental memory tokenRental = Rentable(this).getRenter(_tokenId);
-        return tokenRental.rentalExpiryBlock > block.number;
-    }
-
-    /**
      * @dev Rentable implementation overrides
-     *
+     */
+
+    /**
+     * @inheritdoc Rentable
      */
     function setRenter(
         uint256 _tokenId,
@@ -244,23 +334,30 @@ contract Frame is
         nonReentrant
     {
         // Calculate rent
-        uint256 rentalCostPerBlock = Rentable(this).getRentalPricePerBlock(_tokenId);
+        uint256 rentalCostPerBlock = _getRentalPricePerBlock(_tokenId);
         uint256 rentalCost = _numberOfBlocks * rentalCostPerBlock;
         require(msg.value == rentalCost, "Frame: Incorrect payment");
 
-        // Send to owner
-        address payable tokenOwner = payable(ownerOf(_tokenId));
+        // Calculate rental fee
+        int128 rentalFeeRatio = ABDKMath64x64.divi(rentalFeeNumerator, rentalFeeDenominator);
+        uint256 rentalFeeAmount = ABDKMath64x64.mulu(rentalFeeRatio, rentalCost);
+        address owner = ownerOf(_tokenId);
+        emit RentalFeeCollectedFrom(_tokenId, owner, rentalFeeAmount);
+
+        // Calculate net amount to owner
+        rentalCost = rentalCost - rentalFeeAmount;
+
+        // Send to owner (remainder remains in contract as fee)
+        address payable tokenOwner = payable(owner);
         _transfer(tokenOwner, rentalCost);
 
         // Rent
         _setRenter(_tokenId, _renter, _numberOfBlocks);
     }
 
-    function _transfer(address payable _to, uint256 _amount) internal {
-        (bool success, ) = _to.call{value: _amount}("");
-        require(success, "Frame: Failed to send ETH");
-    }
-
+    /**
+     * @inheritdoc Rentable
+     */
     function setRentalPricePerBlock(uint256 _tokenId, uint256 _rentalPrice)
         external
         override
@@ -270,13 +367,16 @@ contract Frame is
         _setRentalPricePerBlock(_tokenId, _rentalPrice);
     }
 
+    /**
+     * @dev Internal: verify you are the owner or renter of a token
+     */
     function _verifyOwnership(address _ownerOrRenter, uint256 _tokenId)
         internal
         view
         returns (bool)
     {
-        if (_isCurrentlyRented(_tokenId)) {
-            bool rented = _tokenIsRented(_tokenId, _ownerOrRenter);
+        if (Rentable(this).isCurrentlyRented(_tokenId)) {
+            bool rented = _tokenIsRentedByAddress(_tokenId, _ownerOrRenter);
             require(rented, "Frame: Not the Renter");
             return rented;
         } else {
@@ -288,7 +388,10 @@ contract Frame is
 
     /**
      * @dev Exhibitionable implementation overrides
-     *
+     */
+
+    /**
+     * @inheritdoc Exhibitionable
      */
     function setExhibit(
         uint256 _tokenId,
@@ -305,37 +408,43 @@ contract Frame is
         _setExhibit(_tokenId, _exhibitContractAddress, _exhibitTokenId);
     }
 
+    /**
+     * @inheritdoc Exhibitionable
+     */
     function clearExhibit(uint256 _tokenId) external override tokenExists(_tokenId) nonReentrant {
         _verifyOwnership(_msgSender(), _tokenId);
         _clearExhibit(_tokenId);
     }
 
     /**
-     * @dev Grants `DEFAULT_ADMIN_ROLE`, `MINTER_ROLE` and `PAUSER_ROLE` to the
-     * account that deploys the contract.
+     * @dev Frame
      */
-    constructor(
-        string memory _name,
-        string memory _symbol,
-        string memory _baseTokenUri,
-        string memory _contractUri,
-        address _vrfCoordinator,
-        address _link,
-        bytes32 _keyHash,
-        uint256 _fee
-    )
-        ERC721PresetMinterPauserAutoId(_name, _symbol, _baseTokenUri)
-        VRFConsumerBase(_vrfCoordinator, _link)
-    {
-        // Used to generate a metadata location for the entire contract
-        // commonly used on secondary marketplaces like OpenSea to display collection information
-        contractURI = _contractUri;
 
-        // Used to requestRandomness from VRFConsumerBase
-        fee = _fee;
-        keyHash = _keyHash;
+    /**
+     * @notice Set rental fee
+     * @param _numerator   Rental fee numerator
+     * @param _denominator Rental fee denominator
+     */
+    function setRentalFee(int256 _numerator, int256 _denominator) external onlyOwner(_msgSender()) {
+        int256 oldNumerator = rentalFeeNumerator;
+        int256 oldDenominator = rentalFeeDenominator;
+        rentalFeeNumerator = _numerator;
+        rentalFeeDenominator = _denominator;
+        emit RentalFeeUpdated(
+            oldNumerator,
+            oldDenominator,
+            rentalFeeNumerator,
+            rentalFeeDenominator
+        );
     }
 
+    /**
+     * @notice Configure a category
+     * @param _category        Category to configure
+     * @param _price           Price of this category
+     * @param _startingTokenId Starting token ID of the category
+     * @param _supply          Number of tokens in this category
+     */
     function setCategoryDetail(
         Category _category,
         uint256 _price,
@@ -353,17 +462,31 @@ contract Frame is
         }
     }
 
-    function setCategoriesInitialized() external onlyOwner(_msgSender()) {
-        categoriesInitialized = true;
+    /**
+     * @notice Set the status of the sale
+     * @dev    Possible statuses are the enum SaleStatus
+     * @param _status          Status to set
+     */
+    function setSaleStatus(SaleStatus _status) external onlyOwner(_msgSender()) {
+        saleStatus = _status;
     }
 
+    /**
+     * @notice Mint a Frame in a given Category
+     * @param _category   Category to mint
+     */
     function mintFrame(Category _category)
         external
         payable
-        categoriesReady
+        mintingAvailable
         validCategory(_category)
         nonReentrant
+        whenNotPaused
     {
+        if (saleStatus == SaleStatus.PRESALE) {
+            require(hasRole(PRESALE_ROLE, _msgSender()), "Frame: Address not on list");
+        }
+
         CategoryDetail storage category = categories[_category];
         require(category.tokenIds.length() > 0, "Frame: Sold out");
         require(msg.value == category.price, "Frame: Incorrect payment for category");
@@ -376,6 +499,11 @@ contract Frame is
         emit MintRequest(requestId, _msgSender());
     }
 
+    /**
+     * @notice fulfillRandomness internal ultimately called by Chainlink Oracles
+     * @param requestId     VRF request ID
+     * @param randomNumber  The VRF number
+     */
     function fulfillRandomness(bytes32 requestId, uint256 randomNumber) internal override {
         address minter = requestIdToSender[requestId];
         CategoryDetail storage category = categories[requestIdToCategory[requestId]];
@@ -394,12 +522,24 @@ contract Frame is
         emit MintFulfilled(requestId, minter, tokenIdToAllocate);
     }
 
+    /**
+     * @dev Accounting functions
+     */
+
+    /**
+     * @notice Withdraws all LINK token from this contract
+     * @param _to Address to receive all the LINK
+     */
     function withdrawAllLink(address payable _to) external onlyOwner(_msgSender()) nonReentrant {
         uint256 linkBalance = LINK.balanceOf(address(this));
         require(LINK.transfer(_msgSender(), linkBalance), "Frame: Error sending LINK");
         emit LinkWithdrawn(_to, linkBalance);
     }
 
+    /**
+     * @notice Withdraws an amount of ether from this contract
+     * @param _to Address to receive the ether
+     */
     function withdrawEther(address payable _to, uint256 _value)
         external
         onlyOwner(_msgSender())

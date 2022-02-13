@@ -16,9 +16,7 @@ abstract contract Exhibitionable is IExhibitionable {
         uint256 _tokenId,
         address _exhibitContractAddress,
         uint256 _exhibitTokenId
-    ) external virtual override {
-        _setExhibit(_tokenId, _exhibitContractAddress, _exhibitTokenId);
-    }
+    ) external virtual override;
 
     function _setExhibit(
         uint256 _tokenId,
@@ -31,18 +29,30 @@ abstract contract Exhibitionable is IExhibitionable {
         emit ExhibitSet(_tokenId, _exhibit.contractAddress, _exhibit.tokenId);
     }
 
+    function clearExhibit(uint256 _tokenId) external virtual override;
+
+    function _clearExhibit(uint256 _tokenId) internal {
+        _setExhibit(_tokenId, address(0x0), 0);
+    }
+
+    function getExhibit(uint256 _tokenId) external view override returns (Exhibit memory) {
+        return _exhibits[_tokenId];
+    }
+
     function exhibitIsOwnedBy(
         address _exhibitor,
         address _exhibitContractAddress,
         uint256 _exhibitTokenId
-    ) external view virtual override returns (bool) {
+    ) external view override returns (bool) {
+        bool owned = false;
+
         if (_implementsERC721(_exhibitContractAddress))
-            return _erc721ExhibitIsOwnedBy(_exhibitor, _exhibitContractAddress, _exhibitTokenId);
+            owned = _erc721ExhibitIsOwnedBy(_exhibitor, _exhibitContractAddress, _exhibitTokenId);
 
         if (_implementsERC1155(_exhibitContractAddress))
-            return _erc1155ExhibitIsOwnedBy(_exhibitor, _exhibitContractAddress, _exhibitTokenId);
+            owned = _erc1155ExhibitIsOwnedBy(_exhibitor, _exhibitContractAddress, _exhibitTokenId);
 
-        return false;
+        return owned;
     }
 
     function _implementsERC721(address _contractAddress) internal view returns (bool) {
@@ -95,17 +105,5 @@ abstract contract Exhibitionable is IExhibitionable {
             tokenUri = IERC1155MetadataURI(_exhibit.contractAddress).uri(_exhibit.tokenId);
         }
         return tokenUri;
-    }
-
-    function getExhibit(uint256 _tokenId) external view virtual override returns (Exhibit memory) {
-        return _exhibits[_tokenId];
-    }
-
-    function clearExhibit(uint256 _tokenId) external virtual override {
-        _clearExhibit(_tokenId);
-    }
-
-    function _clearExhibit(uint256 _tokenId) internal {
-        _setExhibit(_tokenId, address(0x0), 0);
     }
 }
