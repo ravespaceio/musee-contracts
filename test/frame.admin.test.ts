@@ -49,17 +49,28 @@ describe("Frame Administration", () => {
         expect(result[3]).to.equal(1);
     });
 
-	it("should not be able to setCategoriesInitialized as non-Owner", async function () {
+	it("should not be able to setSaleStatus as non-Owner", async function () {
 		await expect(
-			Frame.connect(minter1).setCategoriesInitialized()
+			Frame.connect(minter1).setSaleStatus(1)
 		).to.be.revertedWith(
 			"Frame: Only owner"
 		);
     });
 
+	it("should be able to setSaleStatus as Owner", async function () {
+		await Frame.connect(owner).setSaleStatus(1);
+    });
 
-	it("should be able to setCategoriesInitialized as Owner", async function () {
-		await Frame.connect(owner).setCategoriesInitialized();
+	it("should not be able to setRentalFee as non-Owner", async function () {
+		await expect(
+			Frame.connect(minter1).setRentalFee(500, 1000)
+		).to.be.revertedWith(
+			"Frame: Only owner"
+		);
+    });
+
+	it("should be able to setRentalFee as Owner", async function () {
+		await Frame.connect(owner).setRentalFee(100, 1000);
     });
 
 	it("should not be able to setCategoryDetail as non-Owner", async function () {
@@ -99,7 +110,7 @@ describe("Frame Administration", () => {
 	
 	it("should return getCategoryDetail for a valid category A (0)", async function () {
 		const [a,b,c,d] = await Frame.getCategoryDetail(0);
-		expect(a).to.equal(parseEther("100.0"));
+		expect(a).to.equal(parseEther("50.0"));
 		expect(b).to.equal(0);
 		expect(c).to.equal(1);
 		expect(d).to.equal(0);
@@ -109,6 +120,5 @@ describe("Frame Administration", () => {
 		await expect(Frame.getCategoryDetail(25)).to.be.revertedWith(
 			"Transaction reverted: function was called with incorrect parameters"
 		);
-    });  
-
+    });
 });

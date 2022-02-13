@@ -26,7 +26,7 @@ describe("IPFS upload and pinning...", () => {
 	});
 
     it("Should upload a folder of JSON files to IPFS and pin it with Pinata", async function () {
-        metadata = await pinDirectoryToIPFS(pinataKey, pinataSecret, "./test/utils/test_metadata",  "/*.json");
+        metadata = await pinDirectoryToIPFS(pinataKey, pinataSecret, "./test/utils/test_metadata",  "/*");
         expect(metadata).to.be.not.empty;
         expect(metadata).to.have.property("cid");
         expect(metadata).to.have.property("files");

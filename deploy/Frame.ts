@@ -5,30 +5,16 @@ import { Contract } from "ethers";
 import { categories } from "../utils/category";
 import { CategoryDetail, ERC721Metadata, IPFSFolder } from "../utils/types";
 import { pinDirectoryToIPFS } from "../utils/IPFS";
-import { getRandomMetadata, writeJSONFile } from "../utils/metadata";
+import {
+	getExactMetadata,
+	writeJSONFile,
+	getRandomFileFrom,
+} from "../utils/metadata";
+import { allowList } from "../utils/allow_list";
+import { keccak256, toUtf8Bytes } from "ethers/lib/utils";
 
 const pinataKey: string = process.env.PINATA_KEY || "undefined";
 const pinataSecret: string = process.env.PINATA_SECRET || "undefined";
-
-// async function constructFrame(
-// 	Frame: Contract,
-// 	deployer: string,
-// 	category: CategoryDetail,
-// 	tokenId: number,
-// 	retryCount: number
-// ): Promise<void> {
-// 	try {
-// 		if (retryCount > 0) {
-// 			retryCount--;
-// 			await Frame.constructFrame(deployer, category.category, tokenId);
-// 		} else throw `Failed constructing ${tokenId}`;
-// 	} catch (err) {
-// 		console.log(
-// 			`Error constructing ${tokenId} to ${deployer}, retrying ${retryCount} more times...`
-// 		);
-// 		await constructFrame(Frame, deployer, category, tokenId, retryCount);
-// 	}
-// }
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	// @ts-ignore
@@ -36,11 +22,14 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	const { deploy } = deployments;
 	const { deployer } = await getNamedAccounts();
 	const chainID = await getChainId();
+	const testOnly = chainID != "1" && chainID != "4";
 
 	let vrfCoordinatorAddress: string,
 		vrfCoordinatorKeyHash: string,
 		vrfCoordinatorFee: string,
-		linkAddress: string;
+		linkAddress: string,
+		rentalFeeNumerator: string,
+		rentalFeeDenominator: string;
 
 	switch (chainID) {
 		// Mainnet
@@ -51,6 +40,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 			vrfCoordinatorKeyHash =
 				"0xAA77729D3466CA35AE8D28B3BBAC7CC36A5031EFDC430821C02BC31A238AF445";
 			vrfCoordinatorFee = "2.0";
+			rentalFeeNumerator = "50";
+			rentalFeeDenominator = "1000";
 			break;
 		}
 		// Rinkeby
@@ -61,6 +52,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 			vrfCoordinatorKeyHash =
 				"0x2ed0feb3e7fd2022120aa84fab1945545a9f2ffc9076fd6156fa96eaff4c1311";
 			vrfCoordinatorFee = "0.1";
+			rentalFeeNumerator = "50";
+			rentalFeeDenominator = "1000";
 			break;
 		}
 		default: {
@@ -83,6 +76,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 			vrfCoordinatorKeyHash =
 				"0x0000000000000000000000000000000000000000000000000000000000000001";
 			vrfCoordinatorFee = "2.0";
+			rentalFeeNumerator = "500";
+			rentalFeeDenominator = "1000";
 
 			await deploy("ERC721Mock", {
 				from: deployer,
@@ -105,31 +100,45 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	}
 
 	// Upload images
-	console.log(`Uploading images to IPFS and Arweave...`);
+	const directoryToUse = testOnly
+		? "./test/utils/test_images"
+		: "./utils/images";
+	const filesToUse = testOnly ? "/*.jpg" : "/*.jpeg";
+
+	console.log(
+		`Uploading images from ${directoryToUse} with files ${filesToUse} to IPFS and Arweave...`
+	);
 	const imageFolder: IPFSFolder = await pinDirectoryToIPFS(
 		pinataKey,
 		pinataSecret,
-		"./utils/images",
-		"/*.jpg"
+		directoryToUse,
+		filesToUse
 	);
 
-	// Randomize and write JSON metadata locally
-	console.log(`Randomizing metadata ...`);
+	// Create and write JSON metadata locally
+	const metadataFolderToUse = testOnly
+		? "./test/utils/test_metadata"
+		: "./utils/metadata";
+	console.log(
+		`Creating metadata in folder ${metadataFolderToUse} and uploading to IPFS ...`
+	);
+
 	for (let i = 0; i < categories.length; i++) {
 		const category: CategoryDetail = categories[i];
-
 		console.log(`Processing category ${JSON.stringify(category)}`);
 
 		for (let j = 0; j < category.supply; j++) {
 			const tokenId = category.startingTokenId + j;
-			const metadata: ERC721Metadata = getRandomMetadata(
+			const metadata: ERC721Metadata = getExactMetadata(
 				tokenId,
 				categories[i],
-				imageFolder.files
+				testOnly
+					? getRandomFileFrom(imageFolder.files)
+					: imageFolder.files[i]
 			);
 
 			// console.log(`Writing metadata for tokenId ${tokenId} to file ...`);
-			await writeJSONFile(metadata, `${tokenId}`, "./utils/metadata");
+			await writeJSONFile(metadata, `${tokenId}`, metadataFolderToUse);
 		}
 	}
 
@@ -137,10 +146,15 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	const metadataFolder: IPFSFolder = await pinDirectoryToIPFS(
 		pinataKey,
 		pinataSecret,
-		"./utils/metadata",
+		metadataFolderToUse,
 		"/*"
 	);
 	const tokenUri = `ipfs://${metadataFolder.cid}/`;
+
+	// Deploy library
+	const ABDKMath64x64Deploy = await deploy("ABDKMath64x64", {
+		from: deployer,
+	});
 
 	// Deploy contract
 	const FrameDeploy = await deploy("Frame", {
@@ -154,7 +168,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 			linkAddress,
 			vrfCoordinatorKeyHash,
 			parseEther(vrfCoordinatorFee),
+			rentalFeeNumerator,
+			rentalFeeDenominator,
 		],
+		libraries: {
+			ABDKMath64x64: ABDKMath64x64Deploy.address,
+		},
 		log: true,
 	});
 
@@ -164,7 +183,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	);
 
 	// Configure test settings
-	if (chainID !== "1" && chainID !== "4") {
+	if (testOnly) {
 		// Send LINK to Frame contract
 		const Link: Contract = await ethers.getContractAt(
 			"LinkMock",
@@ -198,11 +217,38 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 		);
 	}
 
-	// Set initialized to true
-	await Frame.setCategoriesInitialized();
-	console.log(`Categories are set, contract available to mint`);
+	// Set sale status to off
+	if (testOnly) {
+		await Frame.setSaleStatus(1);
+		console.log(`Deploy complete, sale status is SaleStatus.PRESALE`);
+	} else if (chainID == "4") {
+		await Frame.setSaleStatus(1);
+		console.log(`Deploy complete, sale status is SaleStatus.PRESALE`);
+	} else {
+		await Frame.setSaleStatus(0);
+		console.log(`Deploy complete, sale status is SaleStatus.OFF`);
+	}
+
+	// Set allow list status
+	const PRESALE_ROLE = keccak256(toUtf8Bytes("PRESALE_ROLE"));
+	for (let i = 0; i < allowList.length; i++) {
+		console.log(`Granting PRESALE_ROLE to ${allowList[i]}`);
+		await Frame.grantRole(PRESALE_ROLE, allowList[i]);
+	}
+
+	// If Rinkeby, grant PRESALE_ROLE to Fabu and Tom
+	if (chainID == "4") {
+		await Frame.grantRole(
+			PRESALE_ROLE,
+			"0xA8668E1639733f070C818a155EEBD69cde93c5f3"
+		);
+		await Frame.grantRole(
+			PRESALE_ROLE,
+			"0x830099587797F149f9D989aCb8D83D467e1DF8e6"
+		);
+	}
 };
 
 export default func;
-func.dependencies = ["LINK", "VRFCoordinator"];
+// func.dependencies = ["LINK", "VRFCoordinator"];
 func.tags = ["NFT", "Token", "Frame"];

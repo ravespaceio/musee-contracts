@@ -7,10 +7,11 @@ import { deployments, ethers } from "hardhat";
 import { parseEther } from "@ethersproject/units";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import * as ethersTypes from "ethers";
-
 import { Category } from "../utils/types";
 import { categories } from "../utils/category";
-import { BigNumberish } from "ethers";
+import { mintAndFulfill, mintAndFulfillProps } from "./utils/test_utils";
+import { keccak256, toUtf8Bytes } from "ethers/lib/utils";
+import { isBigNumberish } from "@ethersproject/bignumber/lib/bignumber";
 
 chai.use(chaiAsPromised);
 const expect = chai.expect;
@@ -21,11 +22,8 @@ let minter2: SignerWithAddress;
 let minter3: SignerWithAddress;
 let Frame: ethersTypes.Contract;
 let VRFCoordinator: ethersTypes.Contract;
-let ExhibitERC721Mock: ethersTypes.Contract;
-let ExhibitERC1155Mock: ethersTypes.Contract;
-let NonCompliantContract: ethersTypes.Contract;
 
-const zeroBytes = "0x0000000000000000000000000000000000000000000000000000000000000000";
+const PRESALE_ROLE = keccak256(toUtf8Bytes("PRESALE_ROLE"));
 
 const deploy = deployments.createFixture(async () => {
 	
@@ -46,67 +44,87 @@ const deploy = deployments.createFixture(async () => {
 		"VRFCoordinatorMock",
 		(await deployments.get("VRFCoordinatorMock")).address
 	);
-
-	ExhibitERC721Mock = await ethers.getContractAt(
-		"ERC721Mock",
-		(await deployments.get("ERC721Mock")).address
-	);
-	ExhibitERC1155Mock = await ethers.getContractAt(
-		"ERC1155Mock",
-		(await deployments.get("ERC1155Mock")).address
-	);
-	NonCompliantContract = await ethers.getContractAt(
-		"NonCompliantContract",
-		(await deployments.get("NonCompliantContract")).address
-	);
-
 });
 
-function getRandomInt(min:number, max:number) : number {
-    min = Math.ceil(min);
-    max = Math.floor(max);
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-async function mintAndFulfil(category: Category, minterSigner: SignerWithAddress) : Promise<number> {
-		
-	// Mint request
-	await expect(Frame.connect(minterSigner).mintFrame(category, {value: parseEther(categories[category].price)})).to.emit(Frame, "MintRequest");		
-	
-	// Retrieve _requestId from MintRequest event
-	let filter = Frame?.filters?.MintRequest(null, minterSigner.address);
-	let events = await Frame.queryFilter(filter, "latest");
-	// @ts-ignore
-	const requestId = events[0]?.args["_requestId"];
-
-	// Fulfil minting, randomness is integer category
-	await expect(VRFCoordinator.connect(owner).mockRandomNumber(requestId, parseEther(getRandomInt(1,9999999999).toString()))).to.emit(Frame, "MintFulfilled");
-
-	// Retrieve tokenId from MintFulfilled event
-	filter = Frame?.filters?.MintFulfilled(null, minterSigner.address);
-	events = await Frame.queryFilter(filter, "latest");
-	// @ts-ignore
-	const tokenId = parseInt(events[0]?.args["_tokenId"]);
-	// @ts-ignore
-	const minter = events[0]?.args["_address"];
-
-	// console.log(`RequestId ${requestId} fulfilled for ${minter}, tokenId ${tokenId}`);
-
-	// Verify token ownership
-	const tokenOwner = await Frame.ownerOf(tokenId);
-	expect(tokenOwner).to.equal(minterSigner.address);
-
-	// Verify token is in correct category
-	expect(tokenId).to.be.greaterThanOrEqual(categories[category].startingTokenId);
-	return tokenId;
-}
-
-describe("Frame Minting", () => {
+describe("Frame Minting No Sale", () => {
 	
     before(async function () {});
 
 	beforeEach(async () => {
 		await deploy();
+		await Frame.connect(owner).setSaleStatus(0);
+	});
+
+	it("should not allow minter1 to mint Category K when SaleStatus.OFF is in effect", async function () {
+        await expect(Frame.connect(minter1).mintFrame(Category.K, {value: parseEther(categories[Category.J].price)})).to.be.revertedWith("Frame: Minting not available");
+    });
+});	
+
+describe("Frame Minting Pre-Sale", () => {
+	
+    before(async function () {});
+
+	beforeEach(async () => {
+		await deploy();
+		await Frame.connect(owner).setSaleStatus(1);
+	});
+
+	it("should not allow minter1 to mint Category K when SaleStatus.PRESALE is in effect and minter1 is not whitelisted", async function () {
+        await expect(Frame.connect(minter1).mintFrame(Category.G, {value: parseEther(categories[Category.G].price)})).to.be.revertedWith("Frame: Address not on list");
+    });
+
+	it("should not allow minter2 to mint Category K when SaleStatus.PRESALE is in effect and minter2 is not whitelisted", async function () {
+        await expect(Frame.connect(minter2).mintFrame(Category.F, {value: parseEther(categories[Category.F].price)})).to.be.revertedWith("Frame: Address not on list");
+    });
+
+	it("should not allow minter3 to mint Category K when SaleStatus.PRESALE is in effect and minter2 is not whitelisted", async function () {
+        await expect(Frame.connect(minter3).mintFrame(Category.C, {value: parseEther(categories[Category.C].price)})).to.be.revertedWith("Frame: Address not on list");
+    });
+
+	it("should mint and fulfil randomness for minter1, Category G when SaleStatus.PRESALE is in effect and minter1 is allowlisted", async function () {
+		await Frame.connect(owner).grantRole(PRESALE_ROLE, minter1.address);
+		const props : mintAndFulfillProps = {
+			VRFCoordinator,
+			Frame,
+			category: Category.G,
+			minterSigner: minter1,
+			owner
+		}
+		await mintAndFulfill(props);
+    });
+
+	it("should mint and fulfil randomness for minter2, Category F when SaleStatus.PRESALE is in effect and minter2 is allowlisted", async function () {
+		await Frame.connect(owner).grantRole(PRESALE_ROLE, minter2.address);
+		const props : mintAndFulfillProps = {
+			VRFCoordinator,
+			Frame,
+			category: Category.F,
+			minterSigner: minter2,
+			owner
+		}
+		await mintAndFulfill(props);
+    });
+
+	it("should mint and fulfil randomness for minter3, Category C when SaleStatus.PRESALE is in effect and minter3 is allowlisted", async function () {
+		await Frame.connect(owner).grantRole(PRESALE_ROLE, minter3.address);
+		const props : mintAndFulfillProps = {
+			VRFCoordinator,
+			Frame,
+			category: Category.C,
+			minterSigner: minter3,
+			owner
+		}
+		await mintAndFulfill(props);
+    });
+});	
+
+describe("Frame Minting Main-Sale", () => {
+	
+    before(async function () {});
+
+	beforeEach(async () => {
+		await deploy();
+		await Frame.connect(owner).setSaleStatus(2);
 	});
 
 	it("should not allow minter1 to mint Category K with the incorrect price", async function () {
@@ -118,7 +136,14 @@ describe("Frame Minting", () => {
     });
 
 	it("should fail to mint when the category is already sold out, Category A", async function () {
-		await mintAndFulfil(Category.A, minter1);
+		const props : mintAndFulfillProps = {
+			VRFCoordinator,
+			Frame,
+			category: Category.A,
+			minterSigner: minter1,
+			owner
+		}
+		await mintAndFulfill(props);
 		await expect(Frame.connect(minter2).mintFrame(Category.A, {value: parseEther(categories[Category.A].price)})).to.be.revertedWith("Frame: Sold out");	
     });
 
@@ -131,182 +156,151 @@ describe("Frame Minting", () => {
     });
 
 	it("should mint and fulfil randomness for minter1, Category A", async function () {
-		await mintAndFulfil(Category.A, minter1);
+		const props : mintAndFulfillProps = {
+			VRFCoordinator,
+			Frame,
+			category: Category.A,
+			minterSigner: minter1,
+			owner
+		}
+		await mintAndFulfill(props);
     });
 
 	it("should mint and fulfil randomness for minter1, Category B", async function () {
-		await mintAndFulfil(Category.B, minter1);
+		const props : mintAndFulfillProps = {
+			VRFCoordinator,
+			Frame,
+			category: Category.B,
+			minterSigner: minter1,
+			owner
+		}
+		await mintAndFulfill(props);
     });
 
 	it("should mint and fulfil randomness for minter1, Category C", async function () {
-		await mintAndFulfil(Category.C, minter1);
+		const props : mintAndFulfillProps = {
+			VRFCoordinator,
+			Frame,
+			category: Category.C,
+			minterSigner: minter1,
+			owner
+		}
+		await mintAndFulfill(props);
     });
 
 	it("should mint and fulfil randomness for minter1, Category D", async function () {
-		await mintAndFulfil(Category.D, minter1);
+		const props : mintAndFulfillProps = {
+			VRFCoordinator,
+			Frame,
+			category: Category.D,
+			minterSigner: minter1,
+			owner
+		}
+		await mintAndFulfill(props);
     });
 
 	it("should mint and fulfil randomness for minter1, Category E", async function () {
-		await mintAndFulfil(Category.E, minter1);
+		const props : mintAndFulfillProps = {
+			VRFCoordinator,
+			Frame,
+			category: Category.E,
+			minterSigner: minter1,
+			owner
+		}
+		await mintAndFulfill(props);
     });
 
 	it("should mint and fulfil randomness for minter1, Category F", async function () {
-		await mintAndFulfil(Category.F, minter1);
+		const props : mintAndFulfillProps = {
+			VRFCoordinator,
+			Frame,
+			category: Category.F,
+			minterSigner: minter1,
+			owner
+		}
+		await mintAndFulfill(props);
     });
 
 	it("should mint and fulfil randomness for minter1, Category G", async function () {
-		await mintAndFulfil(Category.G, minter1);
+		const props : mintAndFulfillProps = {
+			VRFCoordinator,
+			Frame,
+			category: Category.G,
+			minterSigner: minter1,
+			owner
+		}
+		await mintAndFulfill(props);
     });
 
 	it("should mint and fulfil randomness for minter1, Category H", async function () {
-		await mintAndFulfil(Category.H, minter1);
+		const props : mintAndFulfillProps = {
+			VRFCoordinator,
+			Frame,
+			category: Category.H,
+			minterSigner: minter1,
+			owner
+		}
+		await mintAndFulfill(props);
     });
 
 	it("should mint and fulfil randomness for minter1, Category I", async function () {
-		await mintAndFulfil(Category.I, minter1);
+		const props : mintAndFulfillProps = {
+			VRFCoordinator,
+			Frame,
+			category: Category.I,
+			minterSigner: minter1,
+			owner
+		}
+		await mintAndFulfill(props);
     });
 
 	it("should mint and fulfil randomness for minter1, Category J", async function () {
-		await mintAndFulfil(Category.J, minter1);
+		const props : mintAndFulfillProps = {
+			VRFCoordinator,
+			Frame,
+			category: Category.J,
+			minterSigner: minter1,
+			owner
+		}
+		await mintAndFulfill(props);
     });
 
 	it("should mint and fulfil randomness for minter1, Category K", async function () {
-		await mintAndFulfil(Category.K, minter1);
+		const props : mintAndFulfillProps = {
+			VRFCoordinator,
+			Frame,
+			category: Category.K,
+			minterSigner: minter1,
+			owner
+		}
+		await mintAndFulfill(props);
     });
 
-});
-
-describe("Frame Exhibiting", () => {
-
-    before(async function () {});
-
-	beforeEach(async () => {
-		await deploy();
-	});	
-
-	// ERC721
-	it("should set and Exhibit on an owned Frame for another owned ERC-721 compatible NFT", async function () {
-		await ExhibitERC721Mock.connect(owner).mint(minter1.address);
-		const exhibitTokenId = 0;
-		const frameTokenId = await mintAndFulfil(Category.K, minter1);
-		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitERC721Mock.address, exhibitTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, ExhibitERC721Mock.address, exhibitTokenId);
+	it("should withdraw 50 ETH after minting event", async function () {
+		const props : mintAndFulfillProps = {
+			VRFCoordinator,
+			Frame,
+			category: Category.A,
+			minterSigner: minter3,
+			owner
+		}
+		await mintAndFulfill(props);
+		const balance : ethersTypes.BigNumberish = await owner.getBalance();
+		await expect(Frame.connect(owner).withdrawEther(owner.address, parseEther("50"))).to.emit(Frame, "EtherWithdrawn").withArgs(owner.address, parseEther("50"));
+		const newBalance : ethersTypes.BigNumberish = await owner.getBalance();
+		expect(newBalance.sub(balance).gt(parseEther("49.99999999")));
+		expect(newBalance.sub(balance).lt(parseEther("50")));
     });
 
-	it("should set and Exhibit on an owned Frame for another owned ERC-721 compatible NFT and retrieve the tokenUri", async function () {
-		await ExhibitERC721Mock.connect(owner).mint(minter1.address);
-		const exhibitTokenId = 0;
-		const frameTokenId = await mintAndFulfil(Category.K, minter1);
-		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitERC721Mock.address, exhibitTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, ExhibitERC721Mock.address, exhibitTokenId);
-		const tokenUri = await Frame.getExhibitTokenURI(frameTokenId);
-		expect(tokenUri).to.equal(`ipfs://ERC721Mock/${exhibitTokenId}`);
+	it("should withdraw all LINK after minting event", async function () {
+		const props : mintAndFulfillProps = {
+			VRFCoordinator,
+			Frame,
+			category: Category.A,
+			minterSigner: minter3,
+			owner
+		}
+		await mintAndFulfill(props);
+		await expect(Frame.connect(owner).withdrawAllLink(owner.address)).to.emit(Frame, "LinkWithdrawn");
     });
-	
-	it("should set and Exhibit on an owned Frame for another owned ERC-721 compatible NFT and then clear it", async function () {
-		await ExhibitERC721Mock.connect(owner).mint(minter1.address);
-		const exhibitTokenId = 0;
-		const frameTokenId = await mintAndFulfil(Category.K, minter1);
-		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitERC721Mock.address, exhibitTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, ExhibitERC721Mock.address, exhibitTokenId);
-		await expect(Frame.connect(minter1).clearExhibit(frameTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, "0x0000000000000000000000000000000000000000", 0);
-    });
-
-	it("should fail to set Exhibit on an owned Frame for an ERC-721 compatible NFT not owned by the Frame owner", async function () {
-		await ExhibitERC721Mock.connect(owner).mint(minter2.address);
-		const exhibitTokenId = 0;
-		const frameTokenId = await mintAndFulfil(Category.K, minter1);
-		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitERC721Mock.address, exhibitTokenId)).to.be.revertedWith("Frame: Exhibit not valid");
-    });
-
-	// ERC-1155
-	it("should set and Exhibit on an owned Frame for another owned ERC-1155 compatible NFT", async function () {
-		await ExhibitERC1155Mock.connect(owner).mint(minter1.address, 0, 1, zeroBytes);
-		const exhibitTokenId = 0;
-		const frameTokenId = await mintAndFulfil(Category.K, minter1);
-		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitERC1155Mock.address, exhibitTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, ExhibitERC1155Mock.address, exhibitTokenId);
-    });
-
-	it("should set and Exhibit on an owned Frame for another owned ERC-1155 compatible NFT and retrieve the tokenUri", async function () {
-		await ExhibitERC1155Mock.connect(owner).mint(minter1.address, 0, 1, zeroBytes);
-		const exhibitTokenId = 0;
-		const frameTokenId = await mintAndFulfil(Category.K, minter1);
-		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitERC1155Mock.address, exhibitTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, ExhibitERC1155Mock.address, exhibitTokenId);
-		const tokenUri = await Frame.getExhibitTokenURI(frameTokenId);
-		expect(tokenUri).to.equal("ipfs://ERC1155Mock/{id}");
-    });
-	
-	it("should set and Exhibit on an owned Frame for another owned ERC-1155 compatible NFT and then clear it", async function () {
-		await ExhibitERC1155Mock.connect(owner).mint(minter1.address, 0, 1, zeroBytes);
-		const exhibitTokenId = 0;
-		const frameTokenId = await mintAndFulfil(Category.K, minter1);
-		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitERC1155Mock.address, exhibitTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, ExhibitERC1155Mock.address, exhibitTokenId);
-		await expect(Frame.connect(minter1).clearExhibit(frameTokenId)).to.emit(Frame, "ExhibitSet").withArgs(frameTokenId, "0x0000000000000000000000000000000000000000", 0);
-    });
-
-	it("should fail to set Exhibit on an owned Frame for an ERC-1155 compatible NFT not owned by the Frame owner", async function () {
-		await ExhibitERC1155Mock.connect(owner).mint(minter2.address, 0, 1, zeroBytes);
-		const exhibitTokenId = 0;
-		const frameTokenId = await mintAndFulfil(Category.K, minter1);
-		await expect(Frame.connect(minter1).setExhibit(frameTokenId, ExhibitERC1155Mock.address, exhibitTokenId)).to.be.revertedWith("Frame: Exhibit not valid");
-    });
-
-	// Non compliant contract
-	it("should fail to set Exhibit on an owned random contract which doesn't implement the ERC-165 standards for ERC-721, ERC-1155 (even if it implments portions of either interface)", async function () {
-		const frameTokenId = await mintAndFulfil(Category.K, minter1);
-		await expect(Frame.connect(minter1).setExhibit(frameTokenId, NonCompliantContract.address, 0)).to.be.revertedWith("Transaction reverted: function selector was not recognized and there's no fallback function");
-    });
-});
-
-describe("Frame Renting", () => {
-
-    before(async function () {});
-
-	beforeEach(async () => {
-		await deploy();
-	});
-	
-	it("should mint a Frame and set the rentalPricePerBlock on it", async function () {
-		const frameTokenId = await mintAndFulfil(Category.K, minter1);
-		await Frame.connect(minter1).setRentalPricePerBlock(frameTokenId, parseEther("0.000000000000000010"));
-		const rentalPricePerBlock = await Frame.getRentalPricePerBlock(frameTokenId);
-		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000010"));
-    });
-
-	it("should mint a Frame and set the rentalPricePerBlock on it, then have someone fail to become the Renter without not enough paid for 10 blocks", async function () {
-		const frameTokenId = await mintAndFulfil(Category.K, minter1);
-		await Frame.connect(minter1).setRentalPricePerBlock(frameTokenId, parseEther("0.000000000000000010"));
-		const rentalPricePerBlock = await Frame.getRentalPricePerBlock(frameTokenId);
-		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000010"));
-		const rentalCost : BigNumberish = parseEther("0.000000000000000010").mul(5);
-		await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, 10,{value: rentalCost})).to.be.revertedWith("Frame: Incorrect payment");
-    });
-
-	it("should mint a Frame and set the rentalPricePerBlock on it, then have someone fail to become the Renter paying too much for 10 blocks", async function () {
-		const frameTokenId = await mintAndFulfil(Category.K, minter1);
-		await Frame.connect(minter1).setRentalPricePerBlock(frameTokenId, parseEther("0.000000000000000010"));
-		const rentalPricePerBlock = await Frame.getRentalPricePerBlock(frameTokenId);
-		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000010"));
-		const rentalCost : BigNumberish = parseEther("0.000000000000000010").mul(20);
-		await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, 10,{value: rentalCost})).to.be.revertedWith("Frame: Incorrect payment");
-    });
-
-	it("should mint a Frame and set the rentalPricePerBlock on it, then have someone become the Renter successfully", async function () {
-		const frameTokenId = await mintAndFulfil(Category.K, minter1);
-		await Frame.connect(minter1).setRentalPricePerBlock(frameTokenId, parseEther("0.000000000000000010"));
-		const rentalPricePerBlock = await Frame.getRentalPricePerBlock(frameTokenId);
-		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000010"));
-		const rentalCost : BigNumberish = parseEther("0.000000000000000010").mul(10);
-		const currentBlockNumber = await ethers.provider.getBlockNumber();
-		await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, 10,{value: rentalCost})).to.emit(Frame, "RenterSet").withArgs(frameTokenId, minter2.address, currentBlockNumber+10+1);
-    });
-
-	it("should mint a Frame and set the rentalPricePerBlock on it, then have someone become the Renter successfully\nthen have someone fail to rent again while it's still rented", async function () {
-		const frameTokenId = await mintAndFulfil(Category.K, minter1);
-		await Frame.connect(minter1).setRentalPricePerBlock(frameTokenId, parseEther("0.000000000000000010"));
-		const rentalPricePerBlock = await Frame.getRentalPricePerBlock(frameTokenId);
-		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000010"));
-		const rentalCost : BigNumberish = parseEther("0.000000000000000010").mul(10);
-		const currentBlockNumber = await ethers.provider.getBlockNumber();
-		await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, 10,{value: rentalCost})).to.emit(Frame, "RenterSet").withArgs(frameTokenId, minter2.address, currentBlockNumber+10+1);
-		await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, 10,{value: rentalCost})).to.be.revertedWith("Frame: Token already rented");
-    });
-
 });
