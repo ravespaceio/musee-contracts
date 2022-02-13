@@ -1,1 +1,7 @@
 node_modules/
+contracts/lib/ABDKMath64x64.sol
+contracts/mocks/NonCompliantContract.sol
+contracts/mocks/ERC721Mock.sol
+contracts/mocks/ERC1155Mock.sol
+contracts/mocks/LinkMock.sol
+contracts/mocks/VRFCoordinatorMock.sol
