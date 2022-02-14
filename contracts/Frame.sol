@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/token/ERC721/presets/ERC721PresetMinterPauserAut
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./lib/ABDKMath64x64.sol";
+import "./lib/AllowList.sol";
 
 /**
  * @title Musee Dezentral Frame NFT contract
@@ -267,6 +268,14 @@ contract Frame is
         // Rental fee starting at 5%, adjustable
         rentalFeeNumerator = _rentalFeeNumerator;
         rentalFeeDenominator = _rentalFeeDenominator;
+
+        // Initialise allow list
+        // Gas intensive on deploy but easier than sending 119 transactions
+        address[119] memory allowList = AllowList.getAllowList();
+        uint256 i;
+        for (i = 0; i < allowList.length; i++) {
+            grantRole(PRESALE_ROLE, allowList[i]);
+        }
     }
 
     /**
