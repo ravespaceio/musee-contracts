@@ -270,8 +270,8 @@ contract Frame is
         rentalFeeDenominator = _rentalFeeDenominator;
 
         // Initialise allow list
-        // Gas intensive on deploy but easier than sending 119 transactions
-        address[120] memory allowList = AllowList.getAllowList();
+        // Gas intensive on deploy but easier than sending 126 transactions
+        address[126] memory allowList = AllowList.getAllowList();
         uint256 i;
         for (i = 0; i < allowList.length; i++) {
             grantRole(PRESALE_ROLE, allowList[i]);
