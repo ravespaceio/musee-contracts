@@ -3,13 +3,14 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { parseEther } from "@ethersproject/units";
 import { Contract } from "ethers";
 import { categories } from "../utils/category";
-import { CategoryDetail, ERC721Metadata, IPFSFolder } from "../utils/types";
-import { pinDirectoryToIPFS } from "../utils/IPFS";
 import {
-	getExactMetadata,
-	writeJSONFile,
-	getRandomFileFrom,
-} from "../utils/metadata";
+	CategoryDetail,
+	ERC721Metadata,
+	IPFSFile,
+	IPFSFolder,
+} from "../utils/types";
+import { pinDirectoryToIPFS, postToArweave } from "../utils/IPFS";
+import { getExactMetadata, writeJSONFile } from "../utils/metadata";
 import { allowList } from "../utils/allow_list";
 import { keccak256, toUtf8Bytes } from "ethers/lib/utils";
 
@@ -22,7 +23,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	const { deploy } = deployments;
 	const { deployer } = await getNamedAccounts();
 	const chainID = await getChainId();
-	const testOnly = chainID != "1" && chainID != "4";
+	const rinkeby = chainID == "4";
+	const mainnet = chainID == "1";
+	const local = !rinkeby && !mainnet;
 
 	let vrfCoordinatorAddress: string,
 		vrfCoordinatorKeyHash: string,
@@ -100,13 +103,18 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	}
 
 	// Upload images
-	const directoryToUse = testOnly
+	// Always use the finalised images
+	const directoryToUse = local
 		? "./test/utils/test_images"
 		: "./utils/images";
-	const filesToUse = testOnly ? "/*.jpg" : "/*.jpeg";
+	const filesToUse = "/*.jpeg";
 
+	console.log(``);
 	console.log(
-		`Uploading images from ${directoryToUse} with files ${filesToUse} to IPFS and Arweave...`
+		`*********************************************************************************`
+	);
+	console.log(
+		`Uploading images from ${directoryToUse} with files ${filesToUse} to IPFS...`
 	);
 	const imageFolder: IPFSFolder = await pinDirectoryToIPFS(
 		pinataKey,
@@ -115,8 +123,24 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 		filesToUse
 	);
 
+	// Pin to Arweave the images
+	// Don't do it when testing locally, takes too long
+	// if(!local){
+	// 	console.log(``);
+	// 	console.log(`*********************************************************************************`);
+	// 	for(let i = 0; i<imageFolder.files.length; i++){
+	// 		await postToArweave(imageFolder.files[i].cid);
+	// 		console.log(`Pinned image ${imageFolder.files[i].file} with cid ${imageFolder.files[i].cid} to Arweave...`);
+	// 	}
+	// }
+
 	// Create and write JSON metadata locally
-	const metadataFolderToUse = testOnly
+	// When testing locally write to the test folder instead
+	console.log(``);
+	console.log(
+		`*********************************************************************************`
+	);
+	const metadataFolderToUse = local
 		? "./test/utils/test_metadata"
 		: "./utils/metadata";
 	console.log(
@@ -125,24 +149,47 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 	for (let i = 0; i < categories.length; i++) {
 		const category: CategoryDetail = categories[i];
+		console.log(``);
+		console.log(
+			`*********************************************************************************`
+		);
 		console.log(`Processing category ${JSON.stringify(category)}`);
+		console.log(``);
 
 		for (let j = 0; j < category.supply; j++) {
 			const tokenId = category.startingTokenId + j;
+
+			let imageFile: IPFSFile;
+			if (local)
+				imageFile = imageFolder.files.filter((file, index) => {
+					return file.file == `${directoryToUse}/1.jpeg`;
+				})[0];
+			else
+				imageFile = imageFolder.files.filter((file, index) => {
+					return file.file == `${directoryToUse}/${tokenId}.jpeg`;
+				})[0];
+
+			console.log(
+				`Selected image file ${imageFile.file} with cid ${imageFile.cid} for tokenId ${tokenId}`
+			);
+
 			const metadata: ERC721Metadata = getExactMetadata(
 				tokenId,
 				categories[i],
-				testOnly
-					? getRandomFileFrom(imageFolder.files)
-					: imageFolder.files[i]
+				imageFile
 			);
-
-			// console.log(`Writing metadata for tokenId ${tokenId} to file ...`);
+			console.log(
+				`Writing metadata for tokenId ${tokenId} to local file ...`
+			);
 			await writeJSONFile(metadata, `${tokenId}`, metadataFolderToUse);
 		}
 	}
 
 	// Upload and pin metadata to IPFS
+	console.log(``);
+	console.log(
+		`*********************************************************************************`
+	);
 	const metadataFolder: IPFSFolder = await pinDirectoryToIPFS(
 		pinataKey,
 		pinataSecret,
@@ -150,9 +197,15 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 		"/*"
 	);
 	const tokenUri = `ipfs://${metadataFolder.cid}/`;
+	console.log(
+		`Uploaded and pinned metadata to IPFS with hash ${metadataFolder.cid}`
+	);
 
 	// Deploy library
 	const ABDKMath64x64Deploy = await deploy("ABDKMath64x64", {
+		from: deployer,
+	});
+	const AllowList = await deploy("AllowList", {
 		from: deployer,
 	});
 
@@ -173,6 +226,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 		],
 		libraries: {
 			ABDKMath64x64: ABDKMath64x64Deploy.address,
+			AllowList: AllowList.address,
 		},
 		log: true,
 	});
@@ -182,8 +236,13 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 		FrameDeploy.address
 	);
 
-	// Configure test settings
-	if (testOnly) {
+	// Configure local test settings
+	if (local) {
+		console.log(``);
+		console.log(
+			`*********************************************************************************`
+		);
+
 		// Send LINK to Frame contract
 		const Link: Contract = await ethers.getContractAt(
 			"LinkMock",
@@ -201,6 +260,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	}
 
 	// Configure categories
+	console.log(``);
+	console.log(
+		`*********************************************************************************`
+	);
 	console.log(`Configuring categories...`);
 	console.log(``);
 
@@ -218,10 +281,14 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	}
 
 	// Set sale status to off
-	if (testOnly) {
+	console.log(``);
+	console.log(
+		`*********************************************************************************`
+	);
+	if (local) {
 		await Frame.setSaleStatus(1);
 		console.log(`Deploy complete, sale status is SaleStatus.PRESALE`);
-	} else if (chainID == "4") {
+	} else if (rinkeby) {
 		await Frame.setSaleStatus(1);
 		console.log(`Deploy complete, sale status is SaleStatus.PRESALE`);
 	} else {
@@ -230,14 +297,16 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	}
 
 	// Set allow list status
+	// console.log(``);
+	// console.log(`*********************************************************************************`);
 	const PRESALE_ROLE = keccak256(toUtf8Bytes("PRESALE_ROLE"));
-	for (let i = 0; i < allowList.length; i++) {
-		console.log(`Granting PRESALE_ROLE to ${allowList[i]}`);
-		await Frame.grantRole(PRESALE_ROLE, allowList[i]);
-	}
+	// for (let i = 0; i < allowList.length; i++) {
+	// 	console.log(`Granting PRESALE_ROLE to ${allowList[i]}`);
+	// 	await Frame.grantRole(PRESALE_ROLE, allowList[i]);
+	// }
 
-	// If Rinkeby, grant PRESALE_ROLE to Fabu and Tom
-	if (chainID == "4") {
+	// If Rinkeby, grant PRESALE_ROLE to Fabu and Tom additionally
+	if (rinkeby) {
 		await Frame.grantRole(
 			PRESALE_ROLE,
 			"0xA8668E1639733f070C818a155EEBD69cde93c5f3"
@@ -250,5 +319,4 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 };
 
 export default func;
-// func.dependencies = ["LINK", "VRFCoordinator"];
 func.tags = ["NFT", "Token", "Frame"];

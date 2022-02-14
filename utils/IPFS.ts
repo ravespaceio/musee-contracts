@@ -99,7 +99,7 @@ export async function postToArweave(ipfsHash: string): Promise<any> {
 		const response = await instance.post(
 			`https://ipfs2arweave.com/permapin/${ipfsHash}`
 		);
-		// log(`Posted to Arweave, result ${JSON.stringify(response.data)}`);
+		log(`Posted to Arweave, result ${JSON.stringify(response.data)}`);
 		return response.data;
 	} catch (err) {
 		log(err);

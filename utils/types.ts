@@ -49,4 +49,5 @@ export interface CategoryDetail {
 	price: string;
 	supply: number;
 	startingTokenId: number;
+	type: string;
 }

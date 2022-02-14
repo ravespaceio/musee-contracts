@@ -11,7 +11,7 @@ describe("IPFS upload and pinning...", () => {
     const pinataSecret: string = process.env.PINATA_SECRET || "undefined";
 	
     it("Should upload a folder of images to IPFS and pin it with Pinata", async function () {
-        images = await pinDirectoryToIPFS(pinataKey, pinataSecret, "./test/utils/test_images",  "/*.jpg");
+        images = await pinDirectoryToIPFS(pinataKey, pinataSecret, "./test/utils/test_images",  "/*.jpeg");
 		expect(images).to.be.not.empty;
         expect(images).to.have.property("cid");
         expect(images).to.have.property("files");
