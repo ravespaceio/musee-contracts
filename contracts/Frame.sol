@@ -271,7 +271,7 @@ contract Frame is
 
         // Initialise allow list
         // Gas intensive on deploy but easier than sending 119 transactions
-        address[119] memory allowList = AllowList.getAllowList();
+        address[120] memory allowList = AllowList.getAllowList();
         uint256 i;
         for (i = 0; i < allowList.length; i++) {
             grantRole(PRESALE_ROLE, allowList[i]);
@@ -541,7 +541,7 @@ contract Frame is
      */
     function withdrawAllLink(address payable _to) external onlyOwner(_msgSender()) nonReentrant {
         uint256 linkBalance = LINK.balanceOf(address(this));
-        require(LINK.transfer(_msgSender(), linkBalance), "Frame: Error sending LINK");
+        require(LINK.transfer(_to, linkBalance), "Frame: Error sending LINK");
         emit LinkWithdrawn(_to, linkBalance);
     }
 

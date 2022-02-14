@@ -47,6 +47,13 @@ interface IRentable {
     function getRentalPricePerBlock(uint256 _tokenId) external view returns (uint256);
 
     /**
+     * @notice Calculate rental cost to send to setRenter function
+     * @param _tokenId        Token identifier to calculate for
+     * @param _numberOfBlocks Number of blocks to rent for
+     */
+    function calculateRentalCost(uint256 _tokenId, uint256 _numberOfBlocks) external view returns (uint256);
+
+    /**
      * @notice Checks if a token is currently rented by anyone
      * @param _tokenId The token to check is rented
      */

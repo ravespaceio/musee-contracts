@@ -68,9 +68,11 @@ describe("Frame Renting", () => {
             owner
         }
         const frameTokenId = await mintAndFulfill(props);
-		await Frame.connect(minter1).setRentalPricePerBlock(frameTokenId, parseEther("0.000000000000000010"));
+		await Frame.connect(minter1).setRentalPricePerBlock(frameTokenId, parseEther("0.000000000000000011"));
 		const rentalPricePerBlock = await Frame.getRentalPricePerBlock(frameTokenId);
-		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000010"));
+		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000011"));
+        const rentalCost = await Frame.calculateRentalCost(frameTokenId, 10);
+        expect(rentalCost).to.equal(parseEther("0.000000000000000110"));
     });
 
 	it("should mint a Frame and set the rentalPricePerBlock on it, then have someone fail to become the Renter without not enough paid for 5760 blocks", async function () {
@@ -85,7 +87,7 @@ describe("Frame Renting", () => {
 		await Frame.connect(minter1).setRentalPricePerBlock(frameTokenId, parseEther("0.000000000000000010"));
 		const rentalPricePerBlock = await Frame.getRentalPricePerBlock(frameTokenId);
 		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000010"));
-		const rentalCost : BigNumberish = parseEther("0.000000000000000010").mul(BLOCKS_PER_DAY-100);
+        const rentalCost = await Frame.calculateRentalCost(frameTokenId, BLOCKS_PER_DAY-100);
 		await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, BLOCKS_PER_DAY, {value: rentalCost})).to.be.revertedWith("Frame: Incorrect payment");
     });
 
@@ -101,7 +103,7 @@ describe("Frame Renting", () => {
 		await Frame.connect(minter1).setRentalPricePerBlock(frameTokenId, parseEther("0.000000000000000010"));
 		const rentalPricePerBlock = await Frame.getRentalPricePerBlock(frameTokenId);
 		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000010"));
-		const rentalCost : BigNumberish = parseEther("0.000000000000000010").mul(2*BLOCKS_PER_DAY);
+        const rentalCost = await Frame.calculateRentalCost(frameTokenId, BLOCKS_PER_DAY*2);
 		await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, BLOCKS_PER_DAY, {value: rentalCost})).to.be.revertedWith("Frame: Incorrect payment");
     });
 
@@ -117,7 +119,36 @@ describe("Frame Renting", () => {
 		await Frame.connect(minter1).setRentalPricePerBlock(frameTokenId, parseEther("0.000000000000000010"));
 		const rentalPricePerBlock = await Frame.getRentalPricePerBlock(frameTokenId);
 		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000010"));
-		const rentalCost : BigNumberish = parseEther("0.000000000000000010").mul(BLOCKS_PER_DAY);
+        const rentalCost = await Frame.calculateRentalCost(frameTokenId, BLOCKS_PER_DAY);
+		const currentBlockNumber = await ethers.provider.getBlockNumber();
+        console.log(`Current block number ${currentBlockNumber}`);
+        await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, BLOCKS_PER_DAY, {value: rentalCost})).to.emit(Frame, "RenterSet");
+
+        // Double check rental information
+        const [renterAddress, rentalExpiryBlock] = await Frame.getRenter(frameTokenId);
+        expect(renterAddress).to.equal(minter2.address);
+        expect(parseInt(rentalExpiryBlock)).to.be.greaterThanOrEqual(BLOCKS_PER_DAY+currentBlockNumber);
+        const isCurrentlyRented = await Frame.isCurrentlyRented(frameTokenId);
+        expect(isCurrentlyRented);
+        const tokenIsRentedByAddress = await Frame.tokenIsRentedByAddress(frameTokenId, minter2.address);
+        expect(tokenIsRentedByAddress);
+    });
+
+	it("should mint a Frame and set the rentalPricePerBlock on it at .01 ether per day, then have someone become the Renter successfully for 5760 blocks", async function () {
+        const props : mintAndFulfillProps = {
+            VRFCoordinator,
+            Frame,
+            category: Category.K,
+            minterSigner: minter1,
+            owner
+        }
+        const frameTokenId = await mintAndFulfill(props);
+		await Frame.connect(minter1).setRentalPricePerBlock(frameTokenId, parseEther("0.000001736111111111"));
+        const rentalPricePerBlock = await Frame.getRentalPricePerBlock(frameTokenId);
+        console.log(`Rental cost per block = ${rentalPricePerBlock}`);
+		expect(rentalPricePerBlock).to.equal(parseEther("0.000001736111111111"));
+        const rentalCost = await Frame.calculateRentalCost(frameTokenId, BLOCKS_PER_DAY);
+        console.log(`Rental cost per day (for 5760 blocks) = ${rentalCost}`);
 		await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, BLOCKS_PER_DAY, {value: rentalCost})).to.emit(Frame, "RenterSet");
 
         // Double check rental information
@@ -143,7 +174,7 @@ describe("Frame Renting", () => {
 		await Frame.connect(minter1).setRentalPricePerBlock(frameTokenId, parseEther("0.000000000000000010"));
 		const rentalPricePerBlock = await Frame.getRentalPricePerBlock(frameTokenId);
 		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000010"));
-		const rentalCost : BigNumberish = parseEther("0.000000000000000010").mul(BLOCKS_PER_DAY);
+        const rentalCost = await Frame.calculateRentalCost(frameTokenId, BLOCKS_PER_DAY);
 		await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, BLOCKS_PER_DAY, {value: rentalCost})).to.emit(Frame, "RenterSet");
 
         // Double check rental information
@@ -177,7 +208,7 @@ describe("Frame Renting", () => {
 		await Frame.connect(minter1).setRentalPricePerBlock(frameTokenId, parseEther("0.000000000000000010"));
 		const rentalPricePerBlock = await Frame.getRentalPricePerBlock(frameTokenId);
 		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000010"));
-		const rentalCost : BigNumberish = parseEther("0.000000000000000010").mul(BLOCKS_PER_DAY);
+        const rentalCost = await Frame.calculateRentalCost(frameTokenId, BLOCKS_PER_DAY);
 		
         // Rent
         await expect(Frame.connect(minter2).setRenter(frameTokenId, minter2.address, BLOCKS_PER_DAY,{value: rentalCost})).to.emit(Frame, "RenterSet");
@@ -208,7 +239,7 @@ describe("Frame Renting", () => {
 		await Frame.connect(minter1).setRentalPricePerBlock(frameTokenId, parseEther("0.000000000000000010"));
 		const rentalPricePerBlock = await Frame.getRentalPricePerBlock(frameTokenId);
 		expect(rentalPricePerBlock).to.equal(parseEther("0.000000000000000010"));
-		const rentalCost : BigNumberish = parseEther("0.000000000000000010").mul(BLOCKS_PER_DAY);
+        const rentalCost = await Frame.calculateRentalCost(frameTokenId, BLOCKS_PER_DAY);
 
         const rentalFeeNumerator = await Frame.connect(owner).rentalFeeNumerator();
         const rentalFeeDenominator = await Frame.connect(owner).rentalFeeDenominator();

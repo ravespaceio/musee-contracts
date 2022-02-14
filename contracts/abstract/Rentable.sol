@@ -76,4 +76,8 @@ abstract contract Rentable is IRentable {
     function _getRentalPricePerBlock(uint256 _tokenId) internal view returns (uint256) {
         return _rentalPrices[_tokenId];
     }
+
+    function calculateRentalCost(uint256 _tokenId, uint256 _numberOfBlocks) external view override returns (uint256){
+        return _getRentalPricePerBlock(_tokenId) * _numberOfBlocks;
+    }
 }

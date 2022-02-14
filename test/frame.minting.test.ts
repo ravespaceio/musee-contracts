@@ -24,6 +24,7 @@ let Frame: ethersTypes.Contract;
 let VRFCoordinator: ethersTypes.Contract;
 
 const PRESALE_ROLE = keccak256(toUtf8Bytes("PRESALE_ROLE"));
+const MINT_TEST_AMOUNT = 3;
 
 const deploy = deployments.createFixture(async () => {
 	
@@ -155,125 +156,164 @@ describe("Frame Minting Main-Sale", () => {
 		await expect(Frame.connect(minter3).mintFrame(Category.G, {value: parseEther(categories[Category.K].price)})).to.be.revertedWith("Frame: Incorrect payment for category");	
     });
 
+	it("should fail to mint using the direct mint function", async function () {
+		await expect(Frame.connect(minter3).mint(minter3.address)).to.be.revertedWith("ERC721PresetMinterPauserAutoId: must have minter role to mint");	
+    });
+
 	it("should mint and fulfil randomness for minter1, Category A", async function () {
-		const props : mintAndFulfillProps = {
-			VRFCoordinator,
-			Frame,
-			category: Category.A,
-			minterSigner: minter1,
-			owner
+		
+		for(let i = 0; i < categories[Category.A].supply;i++){
+			const props : mintAndFulfillProps = {
+				VRFCoordinator,
+				Frame,
+				category: Category.A,
+				minterSigner: minter1,
+				owner
+			}
+			const tokenId = await mintAndFulfill(props);
+			// console.log(`Minted tokenId ${tokenId}`);
 		}
-		await mintAndFulfill(props);
     });
 
-	it("should mint and fulfil randomness for minter1, Category B", async function () {
-		const props : mintAndFulfillProps = {
-			VRFCoordinator,
-			Frame,
-			category: Category.B,
-			minterSigner: minter1,
-			owner
+	it("should mint and fulfil randomness for minter2, Category B", async function () {
+		
+		for(let i = 0; i < categories[Category.B].supply;i++){
+			const props : mintAndFulfillProps = {
+				VRFCoordinator,
+				Frame,
+				category: Category.B,
+				minterSigner: minter2,
+				owner
+			}
+			const tokenId = await mintAndFulfill(props);
+			// console.log(`Minted tokenId ${tokenId}`);
 		}
-		await mintAndFulfill(props);
     });
 
-	it("should mint and fulfil randomness for minter1, Category C", async function () {
-		const props : mintAndFulfillProps = {
-			VRFCoordinator,
-			Frame,
-			category: Category.C,
-			minterSigner: minter1,
-			owner
+	it("should mint and fulfil randomness for minter3, Category C", async function () {
+		for(let i = 0; i < categories[Category.C].supply;i++){
+			const props : mintAndFulfillProps = {
+				VRFCoordinator,
+				Frame,
+				category: Category.C,
+				minterSigner: minter3,
+				owner
+			}
+			const tokenId = await mintAndFulfill(props);
+			// console.log(`Minted tokenId ${tokenId}`);
 		}
-		await mintAndFulfill(props);
     });
 
 	it("should mint and fulfil randomness for minter1, Category D", async function () {
-		const props : mintAndFulfillProps = {
-			VRFCoordinator,
-			Frame,
-			category: Category.D,
-			minterSigner: minter1,
-			owner
+		for(let i = 0; i < categories[Category.D].supply;i++){
+			const props : mintAndFulfillProps = {
+				VRFCoordinator,
+				Frame,
+				category: Category.D,
+				minterSigner: minter1,
+				owner
+			}
+			const tokenId = await mintAndFulfill(props);
+			// console.log(`Minted tokenId ${tokenId}`);
 		}
-		await mintAndFulfill(props);
     });
 
-	it("should mint and fulfil randomness for minter1, Category E", async function () {
-		const props : mintAndFulfillProps = {
-			VRFCoordinator,
-			Frame,
-			category: Category.E,
-			minterSigner: minter1,
-			owner
+	it("should mint and fulfil randomness for minter2, Category E", async function () {
+		for(let i = 0; i < MINT_TEST_AMOUNT;i++){
+			const props : mintAndFulfillProps = {
+				VRFCoordinator,
+				Frame,
+				category: Category.E,
+				minterSigner: minter2,
+				owner
+			}
+			const tokenId = await mintAndFulfill(props);
+			// console.log(`Minted tokenId ${tokenId}`);
 		}
-		await mintAndFulfill(props);
     });
 
-	it("should mint and fulfil randomness for minter1, Category F", async function () {
-		const props : mintAndFulfillProps = {
-			VRFCoordinator,
-			Frame,
-			category: Category.F,
-			minterSigner: minter1,
-			owner
+	it("should mint and fulfil randomness for minter3, Category F", async function () {
+		for(let i = 0; i < MINT_TEST_AMOUNT;i++){
+			const props : mintAndFulfillProps = {
+				VRFCoordinator,
+				Frame,
+				category: Category.F,
+				minterSigner: minter3,
+				owner
+			}
+			const tokenId = await mintAndFulfill(props);
+			// console.log(`Minted tokenId ${tokenId}`);
 		}
-		await mintAndFulfill(props);
     });
 
 	it("should mint and fulfil randomness for minter1, Category G", async function () {
-		const props : mintAndFulfillProps = {
-			VRFCoordinator,
-			Frame,
-			category: Category.G,
-			minterSigner: minter1,
-			owner
+		for(let i = 0; i < MINT_TEST_AMOUNT;i++){
+			const props : mintAndFulfillProps = {
+				VRFCoordinator,
+				Frame,
+				category: Category.G,
+				minterSigner: minter1,
+				owner
+			}
+			const tokenId = await mintAndFulfill(props);
+			// console.log(`Minted tokenId ${tokenId}`);
 		}
-		await mintAndFulfill(props);
     });
 
-	it("should mint and fulfil randomness for minter1, Category H", async function () {
-		const props : mintAndFulfillProps = {
-			VRFCoordinator,
-			Frame,
-			category: Category.H,
-			minterSigner: minter1,
-			owner
+	it("should mint and fulfil randomness for minter2, Category H", async function () {
+		for(let i = 0; i < MINT_TEST_AMOUNT;i++){
+			const props : mintAndFulfillProps = {
+				VRFCoordinator,
+				Frame,
+				category: Category.H,
+				minterSigner: minter2,
+				owner
+			}
+			const tokenId = await mintAndFulfill(props);
+			// console.log(`Minted tokenId ${tokenId}`);
 		}
-		await mintAndFulfill(props);
     });
 
-	it("should mint and fulfil randomness for minter1, Category I", async function () {
-		const props : mintAndFulfillProps = {
-			VRFCoordinator,
-			Frame,
-			category: Category.I,
-			minterSigner: minter1,
-			owner
+	it("should mint and fulfil randomness for minter3, Category I", async function () {
+		for(let i = 0; i < MINT_TEST_AMOUNT;i++){
+			const props : mintAndFulfillProps = {
+				VRFCoordinator,
+				Frame,
+				category: Category.I,
+				minterSigner: minter3,
+				owner
+			}
+			const tokenId = await mintAndFulfill(props);
+			// console.log(`Minted tokenId ${tokenId}`);
 		}
-		await mintAndFulfill(props);
     });
 
 	it("should mint and fulfil randomness for minter1, Category J", async function () {
-		const props : mintAndFulfillProps = {
-			VRFCoordinator,
-			Frame,
-			category: Category.J,
-			minterSigner: minter1,
-			owner
+		for(let i = 0; i < MINT_TEST_AMOUNT;i++){
+			const props : mintAndFulfillProps = {
+				VRFCoordinator,
+				Frame,
+				category: Category.J,
+				minterSigner: minter1,
+				owner
+			}
+			const tokenId = await mintAndFulfill(props);
+			// console.log(`Minted tokenId ${tokenId}`);
 		}
-		await mintAndFulfill(props);
     });
 
-	it("should mint and fulfil randomness for minter1, Category K", async function () {
-		const props : mintAndFulfillProps = {
-			VRFCoordinator,
-			Frame,
-			category: Category.K,
-			minterSigner: minter1,
-			owner
+	it("should mint and fulfil randomness for minter2, Category K", async function () {
+		for(let i = 0; i < MINT_TEST_AMOUNT;i++){
+			const props : mintAndFulfillProps = {
+				VRFCoordinator,
+				Frame,
+				category: Category.K,
+				minterSigner: minter2,
+				owner
+			}
+			const tokenId = await mintAndFulfill(props);
+			// console.log(`Minted tokenId ${tokenId}`);
 		}
-		await mintAndFulfill(props);
     });
 
 	it("should withdraw 50 ETH after minting event", async function () {
