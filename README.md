@@ -113,14 +113,14 @@ setRentalPricePerBlock(uint256 _tokenId, uint256 _rentalPrice)
 function setRenter(
         uint256 _tokenId,             // tokenId of the _Frame_ to rent
         address _renter,              // address of the renter
-        uint256 _rentalExpiryAtBlock  // the end block of the rental period
+        uint256 _numberOfBlocks    _  // the number of blocks to rent for
     ) payable
 ```
-* This a payable transaction and the renter must supply enough Ether with the function to fulfill the requested amount of blocks.
-* Since one can not know exactly ahead of time the exact block which their transaction will be mined, we will return any paid Ether above the calculated rental cost to the _Renter_.
+* This a payable transaction and the renter must supply exactly enough Ether with the function to fulfill the requested amount of blocks.
+* One can use the function `calculateRentalCost(_tokenId, _numberOfBlocks)` before renting to determine the exact amount (in wei) you need to supply to the function
 
 The _Frame_ itself may be transferred or sold at any time and this does not affect the rights of the _Renter_.
 
 The _Renter_ does not have token ownership and is not able to approve, transfer, or perform any other ERC-721 compatible transactions on the contract.
 
-_Note_: A small proportion of all rental fees (1.5%) will go toward maintaining Musee Dezentral and will be transferred to `museedezentral.eth`.
+_Note_: A small proportion of all rental fees (5%) will go toward maintaining Musee Dezentral and will remain in the contract (`musee-dezentral.eth`).
