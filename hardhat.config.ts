@@ -4,7 +4,8 @@ import "hardhat-docgen";
 import "@nomiclabs/hardhat-waffle";
 import "hardhat-deploy";
 import "@nomiclabs/hardhat-ethers";
-import "hardhat-gas-reporter"
+import "hardhat-gas-reporter";
+import "@nomiclabs/hardhat-etherscan";
 
 task("accounts", "Prints the list of accounts", async (args, hre) => {
   const accounts = await hre.ethers.getSigners();
@@ -104,5 +105,10 @@ export default {
   gasReporter: {
     currency: 'EUR',
     coinmarketcap: getCoinMarketCapAPIKey("rinkeby")
+  },
+  etherscan: {
+    apiKey: {
+      mainnet: process.env.ETHERSCAN_KEY
+    }
   }
 };
