@@ -2,7 +2,7 @@
 pragma solidity ^0.8.4;
 
 library AllowList {
-    function getAllowList() external pure returns (address[126] memory) {
+    function getAllowList() external pure returns (address[128] memory) {
         return [
             0x3146242E1b95A1ACf64E385c84200600AAc78839,
             0x21Cf67Ebba0F6e18cDdb1da09B0361a0Fe621565,
@@ -129,7 +129,9 @@ library AllowList {
             0x56e1b883a7ee8c948d014aF899E2710B8B89dE6d,
             0x90ab7636ee1087816Fc90EC879FBA4716Cb5B346,
             0x845eD9721B289BdaEb01a47160849ADe90277873,
-            0x75bbD7daB6FAc6159357Fdf340c023aB2BA45e92
+            0x75bbD7daB6FAc6159357Fdf340c023aB2BA45e92,
+            0x538b5d6a5C226829b4086b1c19F7FFe6f76276b8,
+            0x56e1b883a7ee8c948d014aF899E2710B8B89dE6d
         ];
     }
 }
