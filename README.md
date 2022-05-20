@@ -4,7 +4,7 @@ This repository contains the Solidity contracts, deployment scripts, and metadat
 
 ## Prerequisities
 
-This is a [hardhat](https://hardhat.org/) and [Yarn](https://yarnpkg.com/) project which builds and deploys an ERC-721 ctransactionompatible NFT called _Frame_, targeted for Ethereum/EVM compatible networks.
+This is a [hardhat](https://hardhat.org/) and [Yarn](https://yarnpkg.com/) project which builds and deploys an ERC-721 compatible NFT called _Frame_, targeted for Ethereum/EVM compatible networks.
 
 ## Configuration
 
