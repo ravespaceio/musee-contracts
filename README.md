@@ -1,6 +1,6 @@
 # musee-contracts
 
-This repository contains the Solidity contracts, deployment scripts, and metadata deployment to IPFS for [Musee-Dezentral](https://musee-dezental.com) NFTs.
+This repository contains the Solidity contracts, deployment scripts, and metadata deployment to IPFS for [Musee-Dezentral](https://musee-dezentral.com) NFTs.
 
 ## Prerequisities
 
