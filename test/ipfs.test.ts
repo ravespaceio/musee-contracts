@@ -7,11 +7,9 @@ describe("IPFS upload and pinning...", () => {
 
     let images: IPFSFolder;
     let metadata: IPFSFolder;
-    const pinataKey : string  = process.env.PINATA_KEY || "undefined";
-    const pinataSecret: string = process.env.PINATA_SECRET || "undefined";
 	
     xit("Should upload a folder of images to IPFS and pin it with Pinata", async function () {
-        images = await pinDirectoryToIPFS(pinataKey, pinataSecret, "./test/utils/test_images",  "/*.jpeg");
+        images = await pinDirectoryToIPFS("./test/utils/test_images",  "/*.jpeg");
 		expect(images).to.be.not.empty;
         expect(images).to.have.property("cid");
         expect(images).to.have.property("files");
@@ -26,7 +24,7 @@ describe("IPFS upload and pinning...", () => {
 	});
 
     xit("Should upload a folder of JSON files to IPFS and pin it with Pinata", async function () {
-        metadata = await pinDirectoryToIPFS(pinataKey, pinataSecret, "./test/utils/test_metadata",  "/*");
+        metadata = await pinDirectoryToIPFS("./test/utils/test_metadata",  "/*");
         expect(metadata).to.be.not.empty;
         expect(metadata).to.have.property("cid");
         expect(metadata).to.have.property("files");

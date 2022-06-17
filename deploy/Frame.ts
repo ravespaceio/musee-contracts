@@ -11,11 +11,8 @@ import {
 } from "../utils/types";
 import { pinDirectoryToIPFS, postToArweave } from "../utils/IPFS";
 import { getExactMetadata, writeJSONFile } from "../utils/metadata";
-import { allowList } from "../utils/allow_list";
 import { keccak256, toUtf8Bytes } from "ethers/lib/utils";
-
-const pinataKey: string = process.env.PINATA_KEY || "undefined";
-const pinataSecret: string = process.env.PINATA_SECRET || "undefined";
+import { sleep } from "../utils/utils";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	// @ts-ignore
@@ -117,22 +114,33 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 		`Uploading images from ${directoryToUse} with files ${filesToUse} to IPFS...`
 	);
 	const imageFolder: IPFSFolder = await pinDirectoryToIPFS(
-		pinataKey,
-		pinataSecret,
 		directoryToUse,
 		filesToUse
 	);
 
 	// Pin to Arweave the images
 	// Don't do it when testing locally, takes too long
-	// if(!local){
-	// 	console.log(``);
-	// 	console.log(`*********************************************************************************`);
-	// 	for(let i = 0; i<imageFolder.files.length; i++){
-	// 		await postToArweave(imageFolder.files[i].cid);
-	// 		console.log(`Pinned image ${imageFolder.files[i].file} with cid ${imageFolder.files[i].cid} to Arweave...`);
-	// 	}
-	// }
+	if(!local){
+		console.log(``);
+		console.log(`*********************************************************************************`);
+		for(let i = 0; i<imageFolder.files.length; i++){
+			try{
+				await postToArweave(imageFolder.files[i].cid);
+				console.log(`Pinned image ${imageFolder.files[i].file} with cid ${imageFolder.files[i].cid} to Arweave...`);
+			}
+			catch(err){
+				console.log(`Error uploading ${imageFolder.files[i].file} / ${imageFolder.files[i].cid}, will pause 10s and retry once...`);
+				sleep(10000);
+				try{
+					await postToArweave(imageFolder.files[i].cid);
+					console.log(`Pinned image ${imageFolder.files[i].file} with cid ${imageFolder.files[i].cid} to Arweave...`);
+				}
+				catch(err){
+					console.log(`Error uploading ${imageFolder.files[i].file} / ${imageFolder.files[i].cid}, during retry attempt, now skipping...`);					
+				}
+			}
+		}
+	}
 
 	// Create and write JSON metadata locally
 	// When testing locally write to the test folder instead
@@ -191,8 +199,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 		`*********************************************************************************`
 	);
 	const metadataFolder: IPFSFolder = await pinDirectoryToIPFS(
-		pinataKey,
-		pinataSecret,
 		metadataFolderToUse,
 		"/*"
 	);

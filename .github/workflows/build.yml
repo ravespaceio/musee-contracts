@@ -27,7 +27,15 @@ jobs:
           yarn docgen
       
       - name: Run Test
-        run: yarn test
+        run: |
+          touch .env.rinkeby
+          yarn coverage
+        env:
+          NODE_ENV: "test"
+          COINMARKETCAP_API: ${{ secrets.COINMARKETCAP_API }}
+          ETHERSCAN_KEY: ${{ secrets.ETHERSCAN_KEY }}
+          PINATA_KEY: ${{ secrets.PINATA_KEY }}
+          PINATA_SECRET: ${{ secrets.PINATA_SECRET }}          
 
       - name: Setup Git Config
         run: |
