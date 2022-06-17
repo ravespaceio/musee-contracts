@@ -1,5 +1,5 @@
 # musee-contracts
-![workflow status](https://github.com/ravespaceio/musee-contracts/Build/badge.svg)
+[![Build](https://github.com/ravespaceio/musee-contracts/actions/workflows/build.yml/badge.svg?branch=rinkeby)](https://github.com/ravespaceio/musee-contracts/actions/workflows/build.yml)
 
 This repository contains the Solidity contracts, deployment scripts, and metadata deployment to IPFS for [Musee-Dezentral](https://musee-dezentral.com) NFTs.
 
