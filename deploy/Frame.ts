@@ -120,23 +120,31 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 	// Pin to Arweave the images
 	// Don't do it when testing locally, takes too long
-	if(!local){
+	if (!local) {
 		console.log(``);
-		console.log(`*********************************************************************************`);
-		for(let i = 0; i<imageFolder.files.length; i++){
-			try{
+		console.log(
+			`*********************************************************************************`
+		);
+		for (let i = 0; i < imageFolder.files.length; i++) {
+			try {
 				await postToArweave(imageFolder.files[i].cid);
-				console.log(`Pinned image ${imageFolder.files[i].file} with cid ${imageFolder.files[i].cid} to Arweave...`);
-			}
-			catch(err){
-				console.log(`Error uploading ${imageFolder.files[i].file} / ${imageFolder.files[i].cid}, will pause 10s and retry once...`);
+				console.log(
+					`Pinned image ${imageFolder.files[i].file} with cid ${imageFolder.files[i].cid} to Arweave...`
+				);
+			} catch (err) {
+				console.log(
+					`Error uploading ${imageFolder.files[i].file} / ${imageFolder.files[i].cid}, will pause 10s and retry once...`
+				);
 				sleep(10000);
-				try{
+				try {
 					await postToArweave(imageFolder.files[i].cid);
-					console.log(`Pinned image ${imageFolder.files[i].file} with cid ${imageFolder.files[i].cid} to Arweave...`);
-				}
-				catch(err){
-					console.log(`Error uploading ${imageFolder.files[i].file} / ${imageFolder.files[i].cid}, during retry attempt, now skipping...`);					
+					console.log(
+						`Pinned image ${imageFolder.files[i].file} with cid ${imageFolder.files[i].cid} to Arweave...`
+					);
+				} catch (err) {
+					console.log(
+						`Error uploading ${imageFolder.files[i].file} / ${imageFolder.files[i].cid}, during retry attempt, now skipping...`
+					);
 				}
 			}
 		}
