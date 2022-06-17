@@ -10,6 +10,9 @@ const log = console.log;
 
 const SLEEP_TIMER = 5000;
 
+const pinataApiKey: string = process.env.PINATA_KEY || "undefined";
+const pinataSecretApiKey: string = process.env.PINATA_SECRET || "undefined";
+
 const ipfs = IPFS.create({
 	host: "ipfs.infura.io",
 	port: 5001,
@@ -17,8 +20,6 @@ const ipfs = IPFS.create({
 });
 
 export async function pinDirectoryToIPFS(
-	pinataApiKey: string,
-	pinataSecretApiKey: string,
 	sourceFolder: string,
 	sourceFolderFilter: string
 ): Promise<IPFSFolder> {

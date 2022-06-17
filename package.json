@@ -1,7 +1,17 @@
 {
   "name": "musee-contracts",
   "version": "0.2.1",
-  "description": "NFT contracts for Musee",
+  "description": "NFT contracts for Musee Dezentral",
+  "engines": {
+    "node": ">=16"
+  },
+  "repository": "https://github.com/ravespaceio/musee-contracts.git",
+  "author": "https://github.com/aaronmboyd",
+  "license": "MIT",  
+  "bugs": {
+     "url": "https://github.com/ravespaceio/musee-contracts/issues"
+  },
+  "homepage": "https://github.com/ravespaceio/musee-contracts#readme",   
   "scripts": {
     "clean": "npx hardhat clean",
     "build": "npx hardhat compile",
@@ -18,21 +28,10 @@
     "prettier:write": "prettier --write ./contracts/*.sol ./contracts/**/*.sol ./test/**/*.ts ./deploy/**/*.ts ./utils/*.ts",
     "lint": "yarn lint:sol",
     "lint:sol": "solhint contracts/**/*.sol contracts/*.sol",
-    "snyk-protect": "snyk protect",
+    "snyk-protect": "snyk-protect",
     "prepare": "npm run snyk-protect",
     "postinstall": "husky install"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/aaronmboyd/musee-contracts.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/aaronmboyd/musee-contracts/issues"
-  },
-  "homepage": "https://github.com/aaronmboyd/musee-contracts#readme",
   "devDependencies": {
     "@chainlink/contracts": "^0.2.2",
     "@nomiclabs/hardhat-ethers": "^2.0.2",
@@ -40,6 +39,7 @@
     "@nomiclabs/hardhat-waffle": "^2.0.1",
     "@openzeppelin/contracts": "^4.1.0",
     "@openzeppelin/test-helpers": "^0.5.11",
+    "@snyk/protect": "^1.952.0",
     "@types/chai": "^4.2.19",
     "@types/chai-as-promised": "^7.1.4",
     "@types/mocha": "^8.2.2",
@@ -62,7 +62,6 @@
     "prettier": "^2.3.2",
     "prettier-plugin-solidity": "^1.0.0-beta.13",
     "shelljs": "^0.8.4",
-    "snyk": "^1.654.0",
     "solhint": "^3.3.6",
     "solidity-coverage": "^0.7.16",
     "ts-node": "^10.0.0",

@@ -117,8 +117,6 @@ describe("Frame Administration", () => {
     });
 	
 	it("should fail to return getCategoryDetail for an invalid category Z (25)", async function () {
-		await expect(Frame.getCategoryDetail(25)).to.be.revertedWith(
-			"Transaction reverted: function was called with incorrect parameters"
-		);
+		await expect(Frame.getCategoryDetail(25)).to.be.reverted;
     });
 });
